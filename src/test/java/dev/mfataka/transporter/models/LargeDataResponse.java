@@ -9,8 +9,6 @@ import java.util.List;
 
 /**
  * @author HAMMA FATAKA
- * @project transporter
- * @date 31.05.2023 14:11
  */
 @Data
 @Builder

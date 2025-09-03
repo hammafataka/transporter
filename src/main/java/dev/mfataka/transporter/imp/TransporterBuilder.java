@@ -42,7 +42,7 @@ public interface TransporterBuilder {
      *
      * @param transporterClientResolver The resolver group to use.
      * @return A WebClientBuilder
-     * @apiNote do not use it with complex configurations, do not set something else if it was not clear what you should use.
+     * do not use it with complex configurations, do not set something else if it was not clear what you should use.
      */
     TransporterBuilder resolver(@NotNull final TransporterClientResolver transporterClientResolver);
 

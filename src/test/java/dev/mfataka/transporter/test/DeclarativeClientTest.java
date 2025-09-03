@@ -7,8 +7,6 @@ import reactor.test.StepVerifier;
 
 /**
  * @author HAMMA FATAKA
- * @project transporter
- * @date 18.12.2023 14:31
  */
 public class DeclarativeClientTest extends AbstractTransporterTest {
 

@@ -16,8 +16,6 @@ import dev.mfataka.transporter.validators.NotNullValidator;
 
 /**
  * @author HAMMA FATAKA
- * @project transporter
- * @date 14.05.2023 3:44
  */
 @Slf4j
 public final class FluxCheckers {

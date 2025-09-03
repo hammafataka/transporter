@@ -5,8 +5,6 @@ import org.springframework.validation.BeanPropertyBindingResult;
 
 /**
  * @author HAMMA FATAKA
- * @project transporter
- * @date 22.07.2022 18:22
  */
 public final class Matcher<T> {
     private final T target;

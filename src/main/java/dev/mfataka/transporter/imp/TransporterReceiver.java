@@ -13,8 +13,6 @@ import dev.mfataka.transporter.model.TransporterData;
 
 /**
  * @author HAMMA FATAKA
- * @project transporter
- * @date 14.05.2023 3:47
  */
 public interface TransporterReceiver {
 
@@ -22,7 +20,7 @@ public interface TransporterReceiver {
      * method to receive data of client request
      *
      * @param responseType type of expected response of required request
-     * @return {@link Mono < TransporterData >} of required response type
+     * @return {@link Mono} of required response type
      */
     <T> Mono<TransporterData<T>> transporterData(@NotNull final Class<T> responseType);
 
@@ -30,7 +28,7 @@ public interface TransporterReceiver {
      * method to receive data of client request, its blocking operation
      *
      * @param responseType type of expected response of required request
-     * @return {@link Mono < TransporterData >} of required response type
+     * @return {@link Mono } of required response type
      */
     <T> TransporterData<T> transporterDataBlock(@NotNull final Class<T> responseType);
 
@@ -80,7 +78,7 @@ public interface TransporterReceiver {
      *
      * @param enabled true if the required fields should be checked, false otherwise.
      * @return ResponseReceiver for more options.
-     * @apiNote you need to document models for jackson mapper see {@link DemoResponse} for more info about documenting it
+     * you need to document models for jackson mapper see {@link DemoResponse} for more info about documenting it
      */
     TransporterReceiver checkRequiredFields(@Nullable final Boolean enabled);
 

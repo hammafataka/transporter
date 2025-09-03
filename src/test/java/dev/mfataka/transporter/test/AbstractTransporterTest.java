@@ -14,8 +14,6 @@ import dev.mfataka.transporter.imp.TransporterBuilder;
 
 /**
  * @author HAMMA FATAKA
- * @project transporter
- * @date 15.05.2023 10:43
  */
 @ActiveProfiles("test")
 @SpringBootTest(classes = Application.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)

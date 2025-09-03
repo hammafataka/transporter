@@ -16,8 +16,6 @@ import dev.mfataka.transporter.DefaultBaseTransporter;
 
 /**
  * @author HAMMA FATAKA
- * @project transporter
- * @date 25.03.2025 12:18
  */
 @Configuration
 @AutoConfigureOrder

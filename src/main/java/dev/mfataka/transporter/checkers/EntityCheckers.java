@@ -20,8 +20,6 @@ import dev.mfataka.transporter.validators.NotNullValidator;
 
 /**
  * @author HAMMA FATAKA
- * @project transporter
- * @date 07.09.2022 13:53
  */
 @Slf4j
 public final class EntityCheckers {

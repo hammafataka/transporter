@@ -15,8 +15,6 @@ import dev.mfataka.transporter.model.TransporterClientResolver;
 
 /**
  * @author HAMMA FATAKA
- * @project transporter
- * @date 22.08.2022 13:56
  */
 @Slf4j
 @Component

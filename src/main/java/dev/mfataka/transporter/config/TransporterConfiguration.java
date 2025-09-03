@@ -9,8 +9,6 @@ import lombok.NoArgsConstructor;
 
 /**
  * @author HAMMA FATAKA
- * @project transporter
- * @date 05.05.2022 11:04
  */
 @Data
 @Builder

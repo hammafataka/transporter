@@ -120,8 +120,6 @@ followings are notes to be taken while using transporter.
 
       /**
        * @author HAMMA FATAKA
-       * @project Transporter
-       * @date 05.08.2022 11:41
        */
       @Data
       @NoArgsConstructor

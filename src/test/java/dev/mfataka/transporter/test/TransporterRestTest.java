@@ -2,8 +2,6 @@ package dev.mfataka.transporter.test;
 
 /**
  * @author HAMMA FATAKA
- * @project transporter
- * @date 15.05.2023 10:58
  */
 public class TransporterRestTest extends AbstractTransporterTest {
 

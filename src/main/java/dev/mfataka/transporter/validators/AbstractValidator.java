@@ -13,8 +13,6 @@ import dev.mfataka.transporter.model.TransporterData;
 
 /**
  * @author HAMMA FATAKA
- * @project transporter
- * @date 22.07.2022 16:01
  */
 public abstract class AbstractValidator implements Validator {
 

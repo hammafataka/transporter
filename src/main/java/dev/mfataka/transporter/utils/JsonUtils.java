@@ -11,8 +11,6 @@ import lombok.extern.slf4j.Slf4j;
 
 /**
  * @author HAMMA FATAKA
- * @project transporter
- * @date 14.08.2025 11:30
  */
 
 @Slf4j

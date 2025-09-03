@@ -32,8 +32,6 @@ import lombok.SneakyThrows;
 
 /**
  * @author HAMMA FATAKA
- * @project transporter
- * @date 14.05.2023 20:23
  */
 public class JaxbEncoder implements Encoder<Object> {
     private final JaxbContextRegistrar contextRegistrar = new JaxbContextRegistrar();

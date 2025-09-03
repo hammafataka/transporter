@@ -23,8 +23,6 @@ import dev.mfataka.transporter.model.TransporterData;
 
 /**
  * @author HAMMA FATAKA
- * @project transporter
- * @date 14.05.2023 3:47
  */
 @RequiredArgsConstructor(staticName = "of")
 public class DefaultTransporterReceiver implements TransporterReceiver {

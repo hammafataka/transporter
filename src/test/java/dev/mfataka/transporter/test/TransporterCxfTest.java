@@ -15,8 +15,6 @@ import dev.mfataka.transporter.imp.TransporterReceiver;
 
 /**
  * @author HAMMA FATAKA
- * @project transporter
- * @date 14.05.2023 5:13
  */
 public class TransporterCxfTest extends AbstractTransporterTest {
 

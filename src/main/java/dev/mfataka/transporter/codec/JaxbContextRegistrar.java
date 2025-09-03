@@ -13,8 +13,6 @@ import lombok.SneakyThrows;
 
 /**
  * @author HAMMA FATAKA
- * @project transporter
- * @date 14.05.2023 5:42
  */
 public class JaxbContextRegistrar {
     private final ConcurrentMap<Class<?>, JAXBContext> jaxbContexts = new ConcurrentHashMap<>();

@@ -23,8 +23,6 @@ import lombok.SneakyThrows;
 
 /**
  * @author HAMMA FATAKA
- * @project transporter
- * @date 14.05.2023 5:41
  */
 public class JaxbDecoder extends Jaxb2XmlDecoder {
 

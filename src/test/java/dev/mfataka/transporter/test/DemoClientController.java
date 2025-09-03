@@ -7,8 +7,6 @@ import reactor.core.publisher.Mono;
 
 /**
  * @author HAMMA FATAKA
- * @project transporter
- * @date 18.12.2023 14:32
  */
 
 public interface DemoClientController {

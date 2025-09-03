@@ -3,25 +3,16 @@ plugins {
     id 'idea'
     id 'groovy'
     id 'jacoco'
-    id 'application'
+    id 'signing'
     id 'java-library'
     id 'maven-publish'
     id 'org.sonarqube' version '4.0.0.2929'
-    id 'org.springframework.boot' version '3.1.3'
-    id "nebula.release" version "17.1.0" apply false
+    id 'org.springframework.boot' version '3.5.4'
+    id "com.netflix.nebula.release" version "21.0.0"
     id "io.spring.dependency-management" version "1.1.0"
-    id 'com.google.cloud.tools.jib' version '3.3.1' apply false
-    id "io.freefair.lombok" version "8.3"
+    id 'io.freefair.lombok' version '8.14.2'
+    id 'io.github.gradle-nexus.publish-plugin' version '2.0.0'
 }
-
-apply plugin: 'java'
-apply plugin: 'jacoco'
-apply plugin: 'java-library'
-apply plugin: 'org.sonarqube'
-apply plugin: "nebula.release"
-apply plugin: 'nebula.release'
-apply plugin: 'org.springframework.boot'
-apply plugin: 'io.spring.dependency-management'
 
 group 'dev.mfataka'
 
@@ -57,6 +48,7 @@ test {
 }
 
 java {
+    withJavadocJar()
     toolchain {
         languageVersion = JavaLanguageVersion.of(17)
     }
@@ -81,61 +73,66 @@ artifacts {
 
 publishing {
     publications {
-        maven(MavenPublication) {
-            artifact(tasks.sourcesJar)
-            version = project.version
+        create(project.name, MavenPublication) {
+            group = project.group
+            version project.version
 
-            from components.java
-            afterEvaluate {
-                artifactId = project.name
-            }
-            versionMapping {
-                usage('java-api') {
-                    fromResolutionOf('runtimeClasspath')
+            it.artifact(project.tasks.sourcesJar)
+            it.artifact(project.tasks.javadocJar)
+            it.artifact(project.tasks.jar)
+
+            it.pom.withXml {
+                def dependenciesNode = asNode().appendNode("dependencies")
+                if (!project.tasks.findByName("shadowJar")) {
+                    project.configurations.api.dependencies.each {
+                        def dependencyNode = dependenciesNode.appendNode('dependency')
+                        dependencyNode.appendNode('groupId', it.group)
+                        dependencyNode.appendNode('artifactId', it.name)
+                        dependencyNode.appendNode('version', it.version)
+                        dependencyNode.appendNode('scope', 'compile')
+                    }
                 }
-                usage('java-runtime') {
-                    fromResolutionResult()
-                }
             }
+
             pom {
-                name = 'transporter'
-                description = 'transporter library for transport'
-                inceptionYear.set("2023")
-                organization {
-                    name.set("MFataka")
-                    url.set("https://mfataka.dev/")
-                }
+                name = "transporter"
+                description = 'Wrapper for spring webclient, making easier configurations and resuing them'
+                url = 'https://mfataka.dev'
                 licenses {
                     license {
-                        name = 'The Apache License, Version 2.0'
-                        url = 'https://www.apache.org/licenses/LICENSE-2.0.txt'
+                        name = 'GPL-3.0 License'
+                        url = 'https://www.gnu.org/licenses/gpl-3.0.html'
                     }
                 }
                 developers {
                     developer {
                         id = 'mfataka'
                         name = 'Mohammed Fataka'
-                        email = 'hammafataka@yahoo.com'
+                        email = 'hammafataka@yahoo.fom'
                     }
                 }
-                contributors {
-                    name = 'Mohammed Fataka'
+                scm {
+                    connection = 'scm:git:github.com/hammafataka/transporter.git'
+                    developerConnection = 'scm:git:ssh://github.com/hammafataka/transporter.git'
+                    url = 'https://github.com/hammafataka/transporter/tree/main'
                 }
             }
-
         }
     }
     repositories {
-        maven({ MavenArtifactRepository repository ->
+        maven { ->
 
-            final evn = System.getenv()
-            repository.url = evn.getOrDefault("NEXUS_URL_RELEASE", "")
+            def repoEnv = System.getenv('GITHUB_REPOSITORY') // e.g. "hammafataka/transporter"
+            def (owner, repo) = (repoEnv ?: 'hammafataka/transproter').toLowerCase().split('/')
+            name = "GitHubPackages"
 
-            repository.credentials {
-                username = evn.getOrDefault("NEXUS_USERNAME", "")
-                password = evn.getOrDefault("NEXUS_PASSWORD", "")
+            url = uri("https://maven.pkg.github.com/${owner}/${repo}")
+
+            credentials {
+                username = System.getenv("GITHUB_ACTOR")
+                password = System.getenv("GITHUB_TOKEN")
             }
-        })
+        }
     }
 }
 test {
@@ -156,11 +153,28 @@ jacocoTestReport {
 jacoco {
     toolVersion = "0.8.8"
 }
+nexusPublishing {
+    repositories {
+        sonatype {
+            nexusUrl.set(uri("https://ossrh-staging-api.central.sonatype.com/service/local/"))
+            snapshotRepositoryUrl.set(uri("https://central.sonatype.com/repository/maven-snapshots/"))
+            username = System.getenv('OSSRH_USERNAME')
+            password = System.getenv('OSSRH_PASSWORD')
+        }
+    }
+}
+
+signing {
+    def key = System.getenv('SIGNING_KEY')
+    def pass = System.getenv('SIGNING_PASSWORD')
+    useInMemoryPgpKeys(key, pass)
+    sign publishing.publications
+}
 
 
 sonar {
     properties {
-        property "sonar.projectKey", "epa-transporter"
+        property "sonar.projectKey", "transporter"
         property "sonar.coveragePlugin", "jacoco"
         property "sonar.qualitygate.wait", true
         property "sonar.jacoco.xmlReportPaths", layout.buildDirectory.dir("/reports/jacoco/test/").get()

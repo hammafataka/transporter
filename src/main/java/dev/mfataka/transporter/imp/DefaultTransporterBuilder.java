@@ -374,10 +374,10 @@ public class DefaultTransporterBuilder implements TransporterBuilder {
     @Override
     public HttpServiceProxyFactory getHttpServiceProxyFactory(final String name) {
         final var timeOut = Duration.of(config.getTimeout(), config.getTimeUnit().toChronoUnit());
-        final var clientAdapter = WebClientAdapter.forClient(buildClient());
-        return HttpServiceProxyFactory.builder(clientAdapter)
-                .blockTimeout(timeOut)
-                .reactiveAdapterRegistry(ReactiveAdapterRegistry.getSharedInstance())
+        final var clientAdapter = WebClientAdapter.create(buildClient());
+        clientAdapter.setBlockTimeout(timeOut);
+        clientAdapter.setReactiveAdapterRegistry(ReactiveAdapterRegistry.getSharedInstance());
+        return HttpServiceProxyFactory.builderFor(clientAdapter)
                 .build();
     }
 

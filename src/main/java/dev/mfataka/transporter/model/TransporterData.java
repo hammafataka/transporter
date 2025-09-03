@@ -22,8 +22,6 @@ import dev.mfataka.transporter.handlers.ErrorHandlers;
 
 /**
  * @author HAMMA FATAKA
- * @project transporter
- * @date 25.07.2022 12:49
  */
 @Builder
 @ToString

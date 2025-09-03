@@ -13,8 +13,6 @@ import dev.mfataka.transporter.model.TransporterData;
 
 /**
  * @author HAMMA FATAKA
- * @project transporter
- * @date 22.07.2022 15:01
  */
 public final class NotNullValidator extends AbstractValidator {
 

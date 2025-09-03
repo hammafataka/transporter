@@ -16,8 +16,6 @@ import dev.mfataka.transporter.validators.NotNullValidator;
 
 /**
  * @author HAMMA FATAKA
- * @project transporter
- * @date 22.07.2022 19:03
  * purpose of this class is to check deeply in client responses and resolve them in case of not processable data or successfully responses,
  * it handles errors if it occurred
  */

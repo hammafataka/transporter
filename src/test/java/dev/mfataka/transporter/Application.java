@@ -6,8 +6,6 @@ import org.springframework.test.context.ActiveProfiles;
 
 /**
  * @author HAMMA FATAKA
- * @project transporter
- * @date 14.05.2023 5:13
  */
 @ActiveProfiles("test")
 @SpringBootApplication(scanBasePackages = {"dev.mfataka.transporter"})

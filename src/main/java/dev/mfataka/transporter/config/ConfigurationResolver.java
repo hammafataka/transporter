@@ -10,8 +10,6 @@ import dev.mfataka.transporter.model.TransporterClientResolver;
 
 /**
  * @author HAMMA FATAKA
- * @project transporter
- * @date 22.08.2022 13:52
  * purpose of this resolver is to get common configs for each transporter execution,
  * whenever transporter is used and the common configs are not set separately
  * it will try to resolve it by looking into configs
@@ -32,7 +30,7 @@ public interface ConfigurationResolver {
      * otherwise returns valid value either passed or gets from property
      *
      * @param path The path to the trust store.
-     * @return A Optional<String>
+     * @return AN Optional
      */
     Optional<String> resolveTrustStorePath(@Nullable final String path);
 
@@ -41,7 +39,7 @@ public interface ConfigurationResolver {
      * otherwise returns valid value either passed or gets from property
      *
      * @param password The password to the trust store.
-     * @return A Optional<String>
+     * @return A Optional
      */
     Optional<String> resolveTrustStorePassword(@Nullable final String password);
 
@@ -50,7 +48,7 @@ public interface ConfigurationResolver {
      * otherwise returns valid value either passed or gets from property
      *
      * @param path The path to the trust store.
-     * @return A Optional<String>
+     * @return A Optional
      */
     Optional<String> resolveKeyStorePath(@Nullable final String path);
 
@@ -59,7 +57,7 @@ public interface ConfigurationResolver {
      * otherwise returns valid value either passed or gets from property
      *
      * @param password The password to the trust store.
-     * @return A Optional<String>
+     * @return A Optional
      */
     Optional<String> resolveKeyStorePassword(@Nullable final String password);
 
