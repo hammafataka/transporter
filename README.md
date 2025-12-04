@@ -89,23 +89,20 @@ class UserClient {
 **Blocking variant** (when you absolutely need it):
 
 ```java
-var data = transporter
-        .sendAndReceive("/users/123")
-        .transporterDataBlock(User.class);   // returns TransporterData<User>
+public class Demo {
+    public void showCase() {
+        final var data = transporter
+                .sendAndReceive("/users/123")
+                .transporterDataBlock(User.class);   // returns TransporterData<User>
 
-if(data.
-
-ok()){
-        System.out.
-
-println(data.get().
-
-name());
-        }else{
-        System.err.
-
-println("Failed: "+data.message());
+        if (data.isOk()) {
+            System.out.println(data.get().name());
+        } else {
+            System.err.println("Failed: " + data.message());
         }
+    }
+
+}
 ```
 
 ---
@@ -132,23 +129,20 @@ Mono<Map> map = receiver.monoData(Map.class);
 ## Sending forms, computing Content-Length
 
 ```java
-var formTx = base.toBuilder()
-        .withBaseUrl("https://api.example.com")
-        .restService()
-        .post(Map.of("name", "Nika", "email", "nika@example.com"));
+public class Demo {
+    public void showCase() {
 
-formTx.
+        var formTx = base.toBuilder()
+                .withBaseUrl("https://api.example.com")
+                .restService()
+                .post(Map.of("name", "Nika", "email", "nika@example.com"));
 
-contentType(MediaType.APPLICATION_FORM_URLENCODED)
-      .
-
-withContentLength()                 // computes length from serialized body
-      .
-
-sendAndReceive("/signup")
-      .
-
-transporterDataBlock(String .class); // blocking as String
+        formTx.contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .withContentLength()                 // computes length from serialized body
+                .sendAndReceive("/signup")
+                .transporterDataBlock(String.class); // blocking as String
+    }
+}
 ```
 
 ---
@@ -156,14 +150,18 @@ transporterDataBlock(String .class); // blocking as String
 ## SOAP mode (JAXB codecs)
 
 ```java
-var soapTx = base.toBuilder()
-        .withBaseUrl("https://soap.example.com")
-        .soapService()      // registers JaxbEncoder/JaxbDecoder
-        .post(new MySoapEnvelope(...));
+public class Demo {
+    public void showCase() {
+        var soapTx = base.toBuilder()
+                .withBaseUrl("https://soap.example.com")
+                .soapService()      // registers JaxbEncoder/JaxbDecoder
+                .post(new MySoapEnvelope(...));
 
-var response = soapTx.contentType(MediaType.TEXT_XML)
-        .sendAndReceive("/service")
-        .monoData(MySoapResponse.class);
+        var response = soapTx.contentType(MediaType.TEXT_XML)
+                .sendAndReceive("/service")
+                .monoData(MySoapResponse.class);
+    }
+}
 ```
 
 > In SOAP mode the builder auto-registers `JaxbEncoder` & `JaxbDecoder`.
@@ -173,18 +171,18 @@ var response = soapTx.contentType(MediaType.TEXT_XML)
 ## Auth helpers
 
 ```java
-tx.basicAuth("user","pass").
+public class Demo {
+    public void showCase() {
 
-sendAndReceive("/secure").
-
-monoData(Void .class);
-tx.
-
-bearerAuth("token").
-
-sendAndReceive("/me").
-
-monoData(Profile .class);
+        tx.basicAuth("user", "pass")
+                .sendAndReceive("/secure")
+                .monoData(Void.class);
+        
+        tx.bearerAuth("token")
+                .sendAndReceive("/me")
+                .monoData(Profile.class);
+    }
+}
 ```
 
 ---
@@ -192,28 +190,20 @@ monoData(Profile .class);
 ## Timeouts, redirects, proxies
 
 ```java
-base.withTimeOut(20)              // seconds
-    .
+public class Demo {
+    private final BaseTrasnporter base;
 
-withRedirection()
-    .
-
-withProxy("corp.proxy",8080,"http")
-    .
-
-toBuilder()
-    .
-
-withBaseUrl("https://api.example.com")
-    .
-
-get(null)
-    .
-
-sendAndReceive("/health")
-    .
-
-monoData(String .class);
+    public void showCase() {
+        base.withTimeOut(20)              // seconds
+                .withRedirection()
+                .withProxy("corp.proxy", 8080, "http")
+                .toBuilder()
+                .withBaseUrl("https://api.example.com")
+                .get(null) //body is null
+                .sendAndReceive("/health")
+                .monoData(String.class);
+    }
+}
 ```
 
 ---
@@ -221,47 +211,29 @@ monoData(String .class);
 ## SSL, Trust-all, and **mTLS**
 
 ```java
-// Trust all (dev only!)
-base.trustAll().
+public class Demo {
 
-toBuilder() ...;
+    public void showCase() {
+// Trust all (dev only!)
+        base.trustAll()
+                .toBuilder() ...;
 
 // One-way TLS (custom truststore)
-        base.
-
-secure("/opt/certs/truststore.jks","changeit")
-    .
-
-toBuilder() ...;
+        base.secure("/opt/certs/truststore.jks", "changeit")
+                .toBuilder() ...;
 
 // mTLS (mutual TLS) – provide keystore
-        base.
-
-withMtls("/opt/certs/keystore.p12","changeit")
-    .
-
-withClientConfig(TransporterConfiguration.builder()
-        .
-
-sslEnabled(true)
-        .
-
-trustStorePath("/opt/certs/truststore.jks")
-        .
-
-trustStorePass("changeit")
-        .
-
-keystorePath("/opt/certs/keystore.p12")
-        .
-
-keystorePass("changeit")
-        .
-
-build())
-        .
-
-toBuilder() ...;
+        base.withMtls("/opt/certs/keystore.p12", "changeit")
+                .withClientConfig(TransporterConfiguration.builder()
+                        .sslEnabled(true)
+                        .trustStorePath("/opt/certs/truststore.jks")
+                        .trustStorePass("changeit")
+                        .keystorePath("/opt/certs/keystore.p12")
+                        .keystorePass("changeit")
+                        .build())
+                .toBuilder() ...;
+    }
+}
 ```
 
 > Under the hood `DefaultTransporterBuilder` builds a Netty `SslContext` based on your config. If `trustAll=true` and
@@ -273,25 +245,19 @@ toBuilder() ...;
 ## DNS resolvers
 
 ```java
-base.withResolver(TransporterClientResolver.DEFAULT_RESOLVER) // DefaultAddressResolverGroup
-    .
+public class Demo {
 
-toBuilder()
-    .
+    public void showCase() {
 
-resolver(TransporterClientResolver.CUSTOM)               // DnsAddressResolverGroup (udp/tcp)
-    .
-
-withBaseUrl("https://api.example.com")
-    .
-
-get(null)
-    .
-
-sendAndReceive("/ping")
-    .
-
-monoData(String .class);
+        base.withResolver(TransporterClientResolver.DEFAULT_RESOLVER) // DefaultAddressResolverGroup
+                .toBuilder()
+                .resolver(TransporterClientResolver.CUSTOM)               // DnsAddressResolverGroup (udp/tcp)
+                .withBaseUrl("https://api.example.com")
+                .get(null)
+                .sendAndReceive("/ping")
+                .monoData(String.class);
+    }
+}
 ```
 
 > If you don’t know what to pick, **don’t override it**. `CUSTOM` builds a low-level `DnsNameResolverBuilder` (UDP/TCP
@@ -302,25 +268,17 @@ monoData(String .class);
 ## Logging & debugging
 
 ```java
-base.withDebugging(true)   // richer internal debug logs
-    .
-
-withLogger()          // add Zalando Logbook client handler
-    .
-
-toBuilder()
-    .
-
-withBaseUrl("https://api.example.com")
-    .
-
-get(null)
-    .
-
-sendAndReceive("/ping")
-    .
-
-monoData(String .class);
+public class Demo {
+    public void showCase() {
+        base.withDebugging(true)   // richer internal debug logs
+                .withLogger()          // add Zalando Logbook client handler
+                .toBuilder()
+                .withBaseUrl("https://api.example.com")
+                .get(null)
+                .sendAndReceive("/ping")
+                .monoData(String.class);
+    }
+}
 ```
 
 To **log Authorization headers**, set `transporter.authHeaderLoggingEnabled=true` (or enable via
@@ -351,16 +309,15 @@ TransporterData<User> blocking = tx.sendAndReceive("/users/1").transporterDataBl
 Validation toggles per request:
 
 ```java
-tx.sendAndReceive("/users")
-  .
+public class Demo {
 
-requireNonNull(true)
-  .
-
-checkRequiredFields(true)
-  .
-
-monoData(User .class);
+    public void showCase() {
+        tx.sendAndReceive("/users")
+                .requireNonNull(true)
+                .checkRequiredFields(true)
+                .monoData(User.class);
+    }
+}
 ```
 
 > These flags delegate to your `TransporterConfiguration` and the internal mapping checkers (`MappingChecker`,
@@ -372,24 +329,22 @@ monoData(User .class);
 ## URL building styles
 
 ```java
-// 1) Absolute/relative string
-tx.method(TransporterMethod.GET).
+public class Demo {
 
-sendAndReceive("/users");
+    public void showCase() {
+// 1) Absolute/relative string
+        tx.method(TransporterMethod.GET)
+                .sendAndReceive("/users");
 
 // 2) UriBuilder function
-tx.
-
-method(TransporterMethod.GET)
-  .
-
-sendAndReceive(b ->b.
-
-path("/search").
-
-queryParam("q","nika").
-
-build());
+        tx.method(TransporterMethod.GET)
+                .sendAndReceive(b ->
+                        b.path("/search")
+                                .queryParam("q", "nika")
+                                .build()
+                );
+    }
+}
 ```
 
 ---
@@ -470,51 +425,45 @@ class AppConfigurationResolver implements ConfigurationResolver {
 **Large payloads**
 
 ```java
-base.toBuilder()
-    .
+public class Demo {
 
-withBaseUrl("https://files.example.com")
-    .
-
-dataLimit(20*1024*1024)       // 20 MB max in-memory
-    .
-
-get(null)
-    .
-
-sendAndReceive("/download")
-    .
-
-mapToBuffer();                     // stream buffers
+    public void showCase() {
+        base.toBuilder()
+                .withBaseUrl("https://files.example.com")
+                .dataLimit(20 * 1024 * 1024)       // 20 MB max in-memory
+                .get(null)
+                .sendAndReceive("/download")
+                .mapToBuffer();                     // stream buffers
+    }
+}
 ```
 
 **Form URL-encoded + params**
 
 ```java
-tx.contentType(MediaType.APPLICATION_FORM_URLENCODED)
-  .
+public class Demo {
 
-withUrlParam("locale","en")
-  .
-
-sendAndReceive("/submit")
-  .
-
-transporterDataBlock(String .class);
+    public void showCase() {
+        tx.contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .withUrlParam("locale", "en")
+                .sendAndReceive("/submit")
+                .transporterDataBlock(String.class);
+    }
+}
 ```
 
 **DELETE with body**
 
 ```java
-base.toBuilder().
+public class Demo {
 
-delete(Map.of("hard","true"))
-        .
-
-sendAndReceive("/users/123")
-    .
-
-monoData(Void .class);
+    public void showCase() {
+        base.toBuilder()
+                .delete(Map.of("hard", "true"))
+                .sendAndReceive("/users/123")
+                .monoData(Void.class);
+    }
+}
 ```
 
 ---
@@ -532,8 +481,11 @@ monoData(Void .class);
 ## Cheatsheet
 
 ```java
+public class Demo {
+
+    public void showCase() {
 // Build once per host
-var builder = base
+        var builder = base
                 .withTimeOut(30)
                 .withLogger()
                 .withDebugging(true)
@@ -542,33 +494,19 @@ var builder = base
                 .restService();
 
 // Preset method or on-the-fly
-var t = builder.post(new Dto());
+        var t = builder.post(new Dto());
 // t = builder.build().method(TransporterMethod.POST).bodyValue(new Dto());
 
-t.
-
-contentType(MediaType.APPLICATION_JSON)
- .
-
-bearerAuth("token")
- .
-
-withHeader("X-Id","123")
- .
-
-withUrlParam("verbose","true")
- .
-
-sendAndReceive("/endpoint")
- .
-
-requireNonNull(true)
- .
-
-checkRequiredFields(true)
- .
-
-monoData(Response .class);
+        t.contentType(MediaType.APPLICATION_JSON)
+                .bearerAuth("token")
+                .withHeader("X-Id", "123")
+                .withUrlParam("verbose", "true")
+                .sendAndReceive("/endpoint")
+                .requireNonNull(true)
+                .checkRequiredFields(true)
+                .monoData(Response.class);
+    }
+}
 ```
 
 ---
