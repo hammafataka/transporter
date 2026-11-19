@@ -7,10 +7,12 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.reactive.function.UnsupportedMediaTypeException;
+import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.server.ResponseStatusException;
 
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -18,15 +20,17 @@ import dev.mfataka.transporter.model.TransporterData;
 
 /**
  * @author HAMMA FATAKA
+ * @project transporter
+ * @date 05.05.2022 14:33
  */
 @Slf4j
 public class ErrorHandlers {
 
     /**
-     * It handles errors thrown by the WebClient
+     * It handles errors thrown by the WebClient and returns a Mono<ResponseEntity<T>>
      *
      * @param throwable The exception that was thrown.
-     * @return A Mono
+     * @return A Mono<ResponseEntity<T>>
      */
     public static <T> Mono<TransporterData<T>> handleError(final Throwable throwable) {
         log.error("error sending request, message[{}]", throwable.getMessage(), throwable);
@@ -44,11 +48,11 @@ public class ErrorHandlers {
     }
 
     /**
-     * It takes a `ResponseStatusException` and returns a Mono with the same status code as the
+     * It takes a `ResponseStatusException` and returns a `Mono<ResponseEntity<T>>` with the same status code as the
      * exception
      *
      * @param throwable The exception that was thrown.
-     * @return A Mono
+     * @return A Mono<ResponseEntity<T>>
      */
     public static <T> TransporterData<T> resolveResponseStatusException(final Throwable throwable) {
         final var exception = (ResponseStatusException) throwable;
@@ -78,7 +82,7 @@ public class ErrorHandlers {
      * Otherwise, if the status code is in the 400 series, return a 400 response entity
      *
      * @param statusCode The HTTP status code of the response.
-     * @return A Mono
+     * @return A Mono<ResponseEntity<T>>
      */
     @NotNull
     public static <T> TransporterData<T> handleWithStatus(final HttpStatusCode statusCode) {
@@ -120,7 +124,7 @@ public class ErrorHandlers {
     }
 
     /**
-     * It takes a `HttpStatus` as an argument and returns a Mono if the status is one of the
+     * It takes a `HttpStatus` as an argument and returns a `Mono<ResponseEntity<T>>` if the status is one of the
      * following: `NOT_FOUND`, `TEMPORARY_REDIRECT`, `PERMANENT_REDIRECT`, `INTERNAL_SERVER_ERROR`, `FORBIDDEN`,
      * `UNAUTHORIZED`, `UNSUPPORTED_MEDIA_TYPE`, `BAD_REQUEST`
      *

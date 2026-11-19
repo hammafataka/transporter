@@ -1,5 +1,6 @@
 package dev.mfataka.transporter;
 
+import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 
 import org.jetbrains.annotations.NotNull;
@@ -102,6 +103,38 @@ public interface BaseTransporter {
      * @return {@link  BaseTransporter} for more config set
      */
     BaseTransporter trustAll();
+
+
+    /**
+     * Bounds the underlying reactor-netty connection pool. When configured,
+     * at most {@code maxConnections} concurrent HTTP connections are kept to
+     * any single host; requests beyond that wait up to {@code pendingAcquireTimeout}
+     * for a free connection and then fail fast with
+     * {@code PoolAcquireTimeoutException}.
+     *
+     * <p>Use this as the primary concurrency-bounding mechanism for clients
+     * that fan out across many threads — it caps load on the downstream
+     * service without serialising calls.</p>
+     *
+     * @param maxConnections         max concurrent connections per host (must be {@code > 0})
+     * @param pendingAcquireTimeout  how long a request waits for a connection slot before failing
+     * @return {@link BaseTransporter} for more config set
+     */
+    BaseTransporter withConnectionPool(final int maxConnections, @NotNull final Duration pendingAcquireTimeout);
+
+    /**
+     * Same as {@link #withConnectionPool(int, Duration)} with control over how
+     * many requests may queue waiting for a connection. When the queue is full,
+     * additional requests fail immediately rather than waiting.
+     *
+     * @param maxConnections          max concurrent connections per host
+     * @param pendingAcquireTimeout   how long a request waits before failing
+     * @param pendingAcquireMaxCount  max queued requests; further requests fail fast
+     * @return {@link BaseTransporter} for more config set
+     */
+    BaseTransporter withConnectionPool(final int maxConnections,
+                                       @NotNull final Duration pendingAcquireTimeout,
+                                       final int pendingAcquireMaxCount);
 
 
     /**

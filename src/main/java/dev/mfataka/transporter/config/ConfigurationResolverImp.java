@@ -15,27 +15,13 @@ import dev.mfataka.transporter.model.TransporterClientResolver;
 
 /**
  * @author HAMMA FATAKA
+ * @project transporter
+ * @date 22.08.2022 13:56
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class ConfigurationResolverImp implements ConfigurationResolver {
-    private static final String TRANSPORTER_PREFIX = "transporter";
-    private static final String RESOLVER_PROP = TRANSPORTER_PREFIX + ".resolver";
-    private static final String TRUST_STORE_PROP = TRANSPORTER_PREFIX + ".trustStorePath";
-    private static final String TRUST_STORE_PASS_PROP = TRANSPORTER_PREFIX + ".trustStorePassword";
-    private static final String KEY_STORE_PROP = TRANSPORTER_PREFIX + ".keyStorePath";
-    private static final String KEY_STORE_PASS_PROP = TRANSPORTER_PREFIX + ".keyStorePassword";
-    private static final String REQUIRED_NON_NULL_PROP = TRANSPORTER_PREFIX + ".requireNonNullEnabled";
-    private static final String CHECK_REQUIRED_FIELDS_PROP = TRANSPORTER_PREFIX + ".checkRequiredFields";
-    private static final String AUTH_HEADER_LOGGING_PROP = TRANSPORTER_PREFIX + ".authHeaderLoggingEnabled";
-    private static final String LOGGING_ENABLED_PROP = TRANSPORTER_PREFIX + ".authHeaderLoggingEnabled";
-    private static final String SECURED_ENABLED_PROP = TRANSPORTER_PREFIX + ".secured";
-    private static final String MTLS_ENABLED_PROP = TRANSPORTER_PREFIX + ".mtlsEnabled";
-    private static final String DEBUG_ENABLED_PROP = TRANSPORTER_PREFIX + ".debugEnabled";
-    private static final String DATA_LIMIT_PROP = TRANSPORTER_PREFIX + ".dataLimit";
-    private static final String TRUST_ALL_PROP = TRANSPORTER_PREFIX + ".trustAll";
-    private static final String ALIAS_PROP = TRANSPORTER_PREFIX + ".alias";
     private final Environment environment;
 
     @Override
@@ -118,35 +104,36 @@ public class ConfigurationResolverImp implements ConfigurationResolver {
     }
 
     @Override
-    public void resolveBaseConfigs(@NotNull TransporterConfiguration config) {
+    public boolean resolveKibanaLoggingEnabled(@Nullable Boolean kibanaLoggingEnabled) {
+        return resolveBool(kibanaLoggingEnabled, KIBANA_LOGGING_ENABLED_PROP);
+    }
+
+    @Override
+    public TransporterConfiguration resolveBaseConfigs(@NotNull TransporterConfiguration config) {
         final var resolver = resolveResolver(config.getResolver());
         final var sslEnabled = resolveSecuredEnabled(config.getSslEnabled());
         final var mtlsEnabled = resolveMtls(config.getMtlsEnabled());
         final var loggingEnabled = resolveLoggingEnabled(config.getLoggerEnabled());
         final var authHeaderLogging = resolveAuthHeaderLogging(config.getLogAuthHeaderEnabled());
         final var debugging = resolveDebugging(config.getDebugEnabled());
+        final var kibanaLogging = resolveKibanaLoggingEnabled(config.getKibanaLoggingEnabled());
 
-        config.setResolver(resolver.name());
-        config.setSslEnabled(sslEnabled);
-        config.setMtlsEnabled(mtlsEnabled);
-        config.setDebugEnabled(debugging);
+        final var builder = config.toBuilder()
+                .resolver(resolver.name())
+                .sslEnabled(sslEnabled)
+                .mtlsEnabled(mtlsEnabled)
+                .debugEnabled(debugging)
+                .loggerEnabled(loggingEnabled)
+                .logAuthHeaderEnabled(authHeaderLogging)
+                .kibanaLoggingEnabled(kibanaLogging);
 
-        config.setLoggerEnabled(loggingEnabled);
-        config.setLogAuthHeaderEnabled(authHeaderLogging);
+        resolveTrustStorePath(config.getTrustStorePath()).ifPresent(builder::trustStorePath);
+        resolveTrustStorePassword(config.getTrustStorePass()).ifPresent(builder::trustStorePass);
+        resolveKeyStorePath(config.getKeystorePath()).ifPresent(builder::keystorePath);
+        resolveKeyStorePassword(config.getKeystorePass()).ifPresent(builder::keystorePass);
+        resolveDataSize().ifPresent(builder::dataLimit);
 
-        resolveTrustStorePath(config.getTrustStorePath())
-                .ifPresent(config::setTrustStorePath);
-        resolveTrustStorePassword(config.getTrustStorePass())
-                .ifPresent(config::setTrustStorePass);
-
-        resolveKeyStorePath(config.getKeystorePath())
-                .ifPresent(config::setKeystorePath);
-
-        resolveKeyStorePassword(config.getKeystorePass())
-                .ifPresent(config::setKeystorePass);
-
-        resolveDataSize()
-                .ifPresent(config::setDataLimit);
+        return builder.build();
     }
 
     private Optional<Integer> resolveDataSize() {
@@ -182,7 +169,7 @@ public class ConfigurationResolverImp implements ConfigurationResolver {
         return maybeProperty;
     }
 
-    private Optional<String> resolveProperty(@NotNull final String property) {
+    public Optional<String> resolveProperty(@NotNull final String property) {
         return Optional.ofNullable((environment.getProperty(property))
         );
     }

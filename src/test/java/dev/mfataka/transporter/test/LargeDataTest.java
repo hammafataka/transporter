@@ -16,6 +16,8 @@ import dev.mfataka.transporter.models.LargeDataResponse;
 
 /**
  * @author HAMMA FATAKA
+ * @project transporter
+ * @date 31.05.2023 14:09
  */
 
 public class LargeDataTest extends AbstractTransporterTest {
@@ -37,7 +39,7 @@ public class LargeDataTest extends AbstractTransporterTest {
      */
     @Test
     public void shouldNotThrowDataBufferLimitException() {
-        final Transporter largeDataCapableTransporter = TransporterBuilder.newBuilder(TransporterConfiguration.builder()
+        final Transporter largeDataCapableTransporter = TransporterBuilder.testInstance(TransporterConfiguration.builder()
                         .debugEnabled(true)
                         .build()
                 )
@@ -57,7 +59,7 @@ public class LargeDataTest extends AbstractTransporterTest {
 
     @Test
     public void shouldNotThrowDataBufferLimitExceptionFlatMapped() {
-        final Transporter largeDataCapableTransporter = TransporterBuilder.newBuilder(TransporterConfiguration.builder()
+        final Transporter largeDataCapableTransporter = TransporterBuilder.testInstance(TransporterConfiguration.builder()
                         .debugEnabled(true)
                         .build()
                 )

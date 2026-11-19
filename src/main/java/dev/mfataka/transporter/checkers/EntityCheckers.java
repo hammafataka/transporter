@@ -5,25 +5,23 @@ import java.util.Objects;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.reactive.function.client.ClientResponse;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.json.JsonMapper;
-
-import io.vavr.control.Try;
-
 import reactor.core.publisher.Mono;
 
 import lombok.extern.slf4j.Slf4j;
 
-import dev.mfataka.transporter.handlers.ErrorHandlers;
 import dev.mfataka.transporter.utils.JsonUtils;
+
+import dev.mfataka.transporter.handlers.ErrorHandlers;
+import dev.mfataka.transporter.model.TransporterData;
 import dev.mfataka.transporter.validators.NotNullValidator;
 
 /**
  * @author HAMMA FATAKA
+ * @project transporter
+ * @date 07.09.2022 13:53
  */
 @Slf4j
 public final class EntityCheckers {
-
     public static <T> Mono<ResponseEntity<T>> resolveEntityMapping(final ClientResponse response,
                                                                    final Class<T> responseType,
                                                                    final boolean requireNonNull,

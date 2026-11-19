@@ -6,6 +6,8 @@ import java.time.Duration;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
+import javax.annotation.concurrent.Immutable;
+import javax.annotation.concurrent.ThreadSafe;
 import javax.net.ssl.KeyManagerFactory;
 
 import org.apache.commons.lang3.StringUtils;
@@ -18,7 +20,9 @@ import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.support.WebClientAdapter;
 import org.springframework.web.service.invoker.HttpServiceProxyFactory;
+import org.zalando.logbook.CorrelationId;
 import org.zalando.logbook.Logbook;
+import org.zalando.logbook.core.DefaultCorrelationId;
 import org.zalando.logbook.core.DefaultHttpLogFormatter;
 import org.zalando.logbook.core.DefaultHttpLogWriter;
 import org.zalando.logbook.core.DefaultSink;
@@ -40,77 +44,92 @@ import io.netty.resolver.dns.DnsAddressResolverGroup;
 import io.netty.resolver.dns.DnsNameResolverBuilder;
 
 import reactor.netty.http.client.HttpClient;
+import reactor.netty.resources.ConnectionProvider;
 import reactor.netty.transport.ProxyProvider;
 
 import lombok.SneakyThrows;
-import lombok.extern.slf4j.Slf4j;
+
+import dev.mfataka.transporter.utils.SslUtils;
 
 import dev.mfataka.transporter.codec.JaxbDecoder;
 import dev.mfataka.transporter.codec.JaxbEncoder;
 import dev.mfataka.transporter.config.TransporterConfiguration;
 import dev.mfataka.transporter.enums.TransporterMethod;
+import dev.mfataka.transporter.filters.KibanaLoggingFilter;
 import dev.mfataka.transporter.model.TransporterClientResolver;
-import dev.mfataka.transporter.utils.LoggingUtils;
-import dev.mfataka.transporter.utils.SslUtils;
+import dev.mfataka.transporter.utils.Memoizer;
+import dev.mfataka.transporter.utils.TransporterLog;
 
 /**
- * @author HAMMA FATAKA<br>
- * Project: base<br>
- * Date: 3/21/2022 9:24 AM
+ * Immutable builder. Each mutator returns a new instance carrying an
+ * immutable {@link TransporterConfiguration}. The underlying {@link WebClient}
+ * is built lazily and cached per-builder-instance via {@link Memoizer}.
+ *
+ * @author HAMMA FATAKA
  */
-@Slf4j
+@Immutable
+@ThreadSafe
 public class DefaultTransporterBuilder implements TransporterBuilder {
-    private boolean isSoap;
-    private Integer dataLimit;
-    private final TransporterConfiguration config;
-    private AddressResolverGroup<?> resolverGroup = NoopAddressResolverGroup.INSTANCE;
-    private final LoggingUtils loggingUtils;
-    private WebClient webClient;
+    private static final TransporterLog log = new TransporterLog(DefaultTransporterBuilder.class);
 
+    private final boolean isSoap;
+    @Nullable
+    private final TransporterClientResolver transporterClientResolver;
+    private final TransporterConfiguration config;
+    @Nullable
+    private final WebClient explicitWebClient;
+    private final Memoizer<WebClient> webClientCache;
+
+    private DefaultTransporterBuilder(boolean isSoap,
+                                      @Nullable TransporterClientResolver transporterClientResolver,
+                                      TransporterConfiguration config,
+                                      @Nullable WebClient explicitWebClient) {
+        this.isSoap = isSoap;
+        this.transporterClientResolver = transporterClientResolver;
+        this.config = config;
+        this.explicitWebClient = explicitWebClient;
+        this.webClientCache = new Memoizer<>(() ->
+                explicitWebClient != null ? explicitWebClient : buildClient());
+    }
 
     public static TransporterBuilder of(final TransporterConfiguration config) {
-        return new DefaultTransporterBuilder(config, Boolean.TRUE.equals(config.getDebugEnabled()));
+        return new DefaultTransporterBuilder(false, null, config, null);
     }
-
-    private DefaultTransporterBuilder(final TransporterConfiguration config, boolean isDebugEnabled) {
-        this.config = config;
-        this.loggingUtils = new LoggingUtils(log, isDebugEnabled);
-    }
-
 
     @Override
     public TransporterBuilder withBaseUrl(@NotNull String baseUrl) {
-        this.config.setBaseUrl(baseUrl);
-        return this;
+        return new DefaultTransporterBuilder(isSoap, transporterClientResolver,
+                config.toBuilder().baseUrl(baseUrl).build(), explicitWebClient);
     }
 
-
     @Override
-    public TransporterBuilder resolver(@NotNull TransporterClientResolver transporterClientResolver) {
-        config.setResolverEnabled(true);
-        config.setResolver(transporterClientResolver.name());
-        return this;
+    public TransporterBuilder resolver(@NotNull TransporterClientResolver resolver) {
+        return new DefaultTransporterBuilder(isSoap, resolver,
+                config.toBuilder().resolver(resolver.name()).build(), explicitWebClient);
     }
 
     @Override
     public TransporterBuilder restService() {
-        this.isSoap = false;
-        return this;
+        return new DefaultTransporterBuilder(false, transporterClientResolver, config, explicitWebClient);
     }
 
     @Override
     public TransporterBuilder soapService() {
-        loggingUtils.debugIfEnabled("soap services enabled.");
-        this.isSoap = true;
-        return this;
+        log.debugIfEnabled("soap services enabled.");
+        return new DefaultTransporterBuilder(true, transporterClientResolver, config, explicitWebClient);
     }
 
     @Override
     public TransporterBuilder dataLimit(int limitInBytes) {
-        this.dataLimit = limitInBytes;
-        return this;
+        return new DefaultTransporterBuilder(isSoap, transporterClientResolver,
+                config.toBuilder().dataLimit(limitInBytes).build(), explicitWebClient);
     }
 
+    @Override
+    public TransporterBuilder operator(@NotNull String operator) {
+        return new DefaultTransporterBuilder(isSoap, transporterClientResolver,
+                config.toBuilder().operator(operator).build(), explicitWebClient);
+    }
 
     @Override
     public Transporter build() {
@@ -130,7 +149,6 @@ public class DefaultTransporterBuilder implements TransporterBuilder {
     @Override
     public Transporter put(@Nullable Object nullableBody) {
         return processBuildingClientMethod(TransporterMethod.PUT, nullableBody);
-
     }
 
     @Override
@@ -139,88 +157,79 @@ public class DefaultTransporterBuilder implements TransporterBuilder {
     }
 
     private Transporter processBuildingClientMethod(@Nullable final TransporterMethod method, @Nullable final Object body) {
-        final var webClient = buildClient();
-        return new DefaultTransporter(method, webClient, body, config);
+        return DefaultTransporter.initial(webClientCache.get(), config, method, body);
     }
 
     private WebClient buildClient() {
-        if (Objects.nonNull(webClient)) {
-            return webClient;
-        }
         final var builder = WebClient.builder();
-
         if (StringUtils.isNotEmpty(config.getBaseUrl())) {
             builder.baseUrl(config.getBaseUrl());
         }
+        builder.clientConnector(buildClientConnector());
+        if (config.isKibanaLoggingEnabled()) {
+            builder.filter(new KibanaLoggingFilter());
+            log.debugIfEnabled("kibana call logging is enabled");
+        }
+        log.debugIfEnabled("successfully built reactive client with conf [{}]", config);
+        builder.exchangeStrategies(configureExchangeStrategies());
+        return builder.build();
+    }
 
-
-        final var httpConnector = buildClientConnector();
-        builder.clientConnector(httpConnector);
-        loggingUtils.debugIfEnabled("success fully build reactive client with conf [{}]", config);
-
+    private ExchangeStrategies configureExchangeStrategies() {
+        final var builder = ExchangeStrategies.builder();
         if (isSoap) {
             builder.codecs(this::registerCodecs);
         }
-        if (Objects.isNull(dataLimit) && Objects.nonNull(config.getDataLimit())) {
-            configureDataLimit(builder, config.getDataLimit());
-        }
-
-        if (Objects.nonNull(dataLimit)) {
-            configureDataLimit(builder, dataLimit);
-        }
-
-        final var client = builder.build();
-        this.webClient = client;
-        return client;
-    }
-
-    private void configureDataLimit(final WebClient.Builder builder, final Integer dataLimit) {
-        loggingUtils.debugIfEnabled("data limit is set to [{}]", dataLimit);
-        final ExchangeStrategies codecExchangeStrategy = ExchangeStrategies.builder()
-                .codecs(clientCodecConfigurer -> clientCodecConfigurer.defaultCodecs().maxInMemorySize(dataLimit))
-                .build();
-        builder.exchangeStrategies(codecExchangeStrategy);
+        final var dataLimit = config.getDataLimitOrDefault();
+        builder.codecs(clientCodecConfigurer -> clientCodecConfigurer.defaultCodecs().maxInMemorySize(dataLimit));
+        log.debugIfEnabled("data limit is set to [{}]", dataLimit);
+        return builder.build();
     }
 
     private void registerCodecs(final ClientCodecConfigurer configurer) {
         configurer.customCodecs().register(new JaxbEncoder());
-        configurer.customCodecs().register(new JaxbDecoder());
-        loggingUtils.debugIfEnabled("custom codecs added for soap services");
+        configurer.customCodecs().register(new JaxbDecoder(config.getDataLimitOrDefault()));
+        log.debugIfEnabled("custom codecs added for soap services");
     }
 
     @NotNull
     private ReactorClientHttpConnector buildClientConnector() {
-        var httpClient = HttpClient.create();
-
+        var httpClient = (config.getMaxConnections() != null)
+                ? HttpClient.create(buildConnectionProvider())
+                : HttpClient.create();
         if (Boolean.TRUE.equals(config.getSslEnabled()) || Boolean.TRUE.equals(config.getTrustAll())) {
             httpClient = buildSsl(httpClient);
-            loggingUtils.debugIfEnabled("ssl is build");
+            log.debugIfEnabled("ssl is built");
         }
-
         if (config.isResolverEnabled()) {
-            onResolverEnabled();
-            httpClient = httpClient.resolver(resolverGroup);
+            httpClient = httpClient.resolver(onResolverEnabled());
         }
-
-
         if (config.isFollowRedirection()) {
-            httpClient = httpClient.followRedirect(true);
             httpClient = httpClient.compress(true).followRedirect(true);
         }
-
         httpClient = buildProxy(httpClient);
-
         if (config.isTimeoutEnabled()) {
             httpClient = httpClient
                     .doOnConnected(connection -> connection.addHandlerLast(new ReadTimeoutHandler(config.getTimeout(), config.getTimeUnit())));
             final var timeOut = (int) TimeUnit.SECONDS.toMillis(config.getTimeout());
             httpClient = httpClient.option(ChannelOption.CONNECT_TIMEOUT_MILLIS, timeOut);
             httpClient = httpClient.responseTimeout(Duration.ofSeconds(config.getTimeout()));
-            loggingUtils.debugIfEnabled("timeout is set to [{}] seconds for [responseTimeout,connectTimeout]", timeOut);
+            log.debugIfEnabled("timeout is set to [{}] seconds for [responseTimeout,connectTimeout]", timeOut);
         }
-
         httpClient = buildLogger(httpClient);
         return new ReactorClientHttpConnector(httpClient);
+    }
+
+    @NotNull
+    private ConnectionProvider buildConnectionProvider() {
+        final int max = config.getMaxConnections();
+        final var provider = ConnectionProvider.builder("transporter")
+                .maxConnections(max)
+                .pendingAcquireTimeout(config.getPendingAcquireTimeoutOrDefault())
+                .pendingAcquireMaxCount(config.getPendingAcquireMaxCountOrDefault())
+                .build();
+        log.debugIfEnabled("connection pool: maxConnections=[{}] pendingAcquireTimeout=[{}] pendingAcquireMaxCount=[{}]", max, config.getPendingAcquireTimeoutOrDefault(), config.getPendingAcquireMaxCountOrDefault());
+        return provider;
     }
 
     private HttpClient buildProxy(@NotNull HttpClient httpClient) {
@@ -233,7 +242,7 @@ public class DefaultTransporterBuilder implements TransporterBuilder {
                             .connectTimeoutMillis(timeout)
                             .build()
             );
-            loggingUtils.debugIfEnabled("proxy is set to address[{}], port[{}]", config.getProxyAddress(), config.getProxyPort());
+            log.debugIfEnabled("proxy is set to address[{}], port[{}]", config.getProxyAddress(), config.getProxyPort());
         }
         return httpClient;
     }
@@ -242,26 +251,17 @@ public class DefaultTransporterBuilder implements TransporterBuilder {
     private HttpClient buildSsl(@NotNull HttpClient httpClient) {
         try {
             final var timeOut = Duration.ofSeconds(Objects.isNull(config.getTimeout()) ? 60L : config.getTimeout());
-            if (Boolean.TRUE.equals(config.getTrustAll()) && !config.getSslEnabled()) {
+            if (Boolean.TRUE.equals(config.getTrustAll()) && !Boolean.TRUE.equals(config.getSslEnabled())) {
                 final SslContext context = SslContextBuilder
                         .forClient()
                         .trustManager(InsecureTrustManagerFactory.INSTANCE)
                         .build();
-
-                httpClient = httpClient.secure(ssl -> ssl.sslContext(context)
-                        .handshakeTimeout(timeOut)
-                        .build()
-                );
-                loggingUtils.debugIfEnabled("ssl is build with trust all");
-
+                httpClient = httpClient.secure(ssl -> ssl.sslContext(context).handshakeTimeout(timeOut).build());
+                log.debugIfEnabled("ssl is build with trust all");
             } else if (Boolean.TRUE.equals(config.getSslEnabled())) {
-                httpClient = httpClient.secure(ssl -> ssl
-                        .sslContext(buildContext())
-                        .handshakeTimeout(timeOut)
-                        .build()
-                );
+                httpClient = httpClient.secure(ssl -> ssl.sslContext(buildContext()).handshakeTimeout(timeOut).build());
             }
-            loggingUtils.debugIfEnabled("ssl handshake timeout is [{}]", timeOut);
+            log.debugIfEnabled("ssl handshake timeout is [{}]", timeOut);
             return httpClient;
         } catch (Exception e) {
             log.error("failed to build ssl for transporter, message [{}]", e.getMessage(), e);
@@ -273,44 +273,31 @@ public class DefaultTransporterBuilder implements TransporterBuilder {
         final var defaultType = KeyStore.getDefaultType();
         final var algorithm = KeyManagerFactory.getDefaultAlgorithm();
         final String[] protocols = {"TLSv1.2", "TLSv1.3"};
-
         if (Objects.nonNull(config.getCertPath())) {
             final var sslContext = buildSslFromCert(protocols);
-            loggingUtils.debugIfEnabled("ssl build successfully with cert path");
+            log.debugIfEnabled("ssl build successfully with cert path");
             return sslContext;
         }
         if (Boolean.TRUE.equals(config.getMtlsEnabled())) {
             if (Objects.nonNull(config.getAlias())) {
                 final var sslContext = SslUtils.buildNettyContext(algorithm,
-                        config.getTrustStorePath(),
-                        config.getTrustStorePass(),
-                        config.getTrustStorePath(),
-                        config.getTrustStorePass(),
-                        config.getAlias(),
-                        defaultType,
-                        protocols);
-                loggingUtils.debugIfEnabled("mtls build successfully with alias");
+                        config.getTrustStorePath(), config.getTrustStorePass(),
+                        config.getTrustStorePath(), config.getTrustStorePass(),
+                        config.getAlias(), defaultType, protocols);
+                log.debugIfEnabled("mtls build successfully with alias");
                 return sslContext;
             }
             final var sslContext = SslUtils.buildNettyContext(algorithm,
-                    config.getTrustStorePath(),
-                    config.getTrustStorePass(),
-                    config.getKeystorePath(),
-                    config.getKeystorePass(),
-                    defaultType, protocols
-            );
-            loggingUtils.debugIfEnabled("mtls build successfully");
+                    config.getTrustStorePath(), config.getTrustStorePass(),
+                    config.getKeystorePath(), config.getKeystorePass(),
+                    defaultType, protocols);
+            log.debugIfEnabled("mtls build successfully");
             return sslContext;
         }
         final var sslContext = SslUtils.buildNettyContextWithTrustStore(algorithm,
-                config.getTrustStorePath(),
-                config.getTrustStorePass(),
-                defaultType,
-                protocols
-        );
-        loggingUtils.debugIfEnabled("ssl build successfully");
+                config.getTrustStorePath(), config.getTrustStorePass(), defaultType, protocols);
+        log.debugIfEnabled("ssl build successfully");
         return sslContext;
-
     }
 
     @SneakyThrows
@@ -325,66 +312,66 @@ public class DefaultTransporterBuilder implements TransporterBuilder {
         if (Boolean.TRUE.equals(config.getLoggerEnabled())) {
             final var loggerBuilder = Logbook
                     .builder()
-                    .sink(new DefaultSink(
-                                    new DefaultHttpLogFormatter(),
-                                    new DefaultHttpLogWriter()
-                            )
-                    );
+                    .correlationId(sharedCorrelationId())
+                    .sink(new DefaultSink(new DefaultHttpLogFormatter(), new DefaultHttpLogWriter()));
             if (Boolean.TRUE.equals(config.getLogAuthHeaderEnabled())) {
-                loggerBuilder
-                        .headerFilter(headers -> headers);
+                loggerBuilder.headerFilter(headers -> headers);
             }
             httpClient = httpClient.doOnConnected(connection ->
-                    connection.addHandlerLast(new LogbookClientHandler(loggerBuilder.build()))
-            );
+                    connection.addHandlerLast(new LogbookClientHandler(loggerBuilder.build())));
         }
         return httpClient;
     }
 
     /**
+     * Reuses the correlation id that {@link KibanaLoggingFilter} stamps on the
+     * {@code X-Correlation-Id} header so that Logbook's request/response body
+     * records carry the same id as the kibana marker record and can be paired in
+     * kibana. Falls back to Logbook's default id when the header is absent (e.g.
+     * kibana logging disabled).
+     */
+    private CorrelationId sharedCorrelationId() {
+        final var fallback = new DefaultCorrelationId();
+        return request -> {
+            final var fromHeader = request.getHeaders().getFirst(KibanaLoggingFilter.CORRELATION_ID_HEADER);
+            return fromHeader != null ? fromHeader : fallback.generate(request);
+        };
+    }
+
+    /**
      * Dangerous zone, please carefully :)
      */
-    private void onResolverEnabled() {
+    private AddressResolverGroup<?> onResolverEnabled() {
         final var resolver = TransporterClientResolver.fromName(config.getResolver());
-        switch (resolver) {
-            case DEFAULT_RESOLVER:
-                this.resolverGroup = DefaultAddressResolverGroup.INSTANCE;
-                break;
-            case CUSTOM:
-                this.resolverGroup = new DnsAddressResolverGroup(
-                        new DnsNameResolverBuilder()
-                                .channelType(NioDatagramChannel.class)
-                                .channelFactory(new ReflectiveChannelFactory<>(NioDatagramChannel.class))
-                                .eventLoop(new DefaultEventLoop())
-                                .socketChannelFactory(new ReflectiveChannelFactory<>(NioSocketChannel.class))
-
-                );
-                break;
-            default:
-                this.resolverGroup = NoopAddressResolverGroup.INSTANCE;
-                break;
-        }
+        return switch (resolver) {
+            case DEFAULT_RESOLVER -> DefaultAddressResolverGroup.INSTANCE;
+            case CUSTOM -> new DnsAddressResolverGroup(
+                    new DnsNameResolverBuilder()
+                            .datagramChannelType(NioDatagramChannel.class)
+                            .datagramChannelFactory(new ReflectiveChannelFactory<>(NioDatagramChannel.class))
+                            .eventLoop(new DefaultEventLoop())
+                            .socketChannelFactory(new ReflectiveChannelFactory<>(NioSocketChannel.class)));
+            default -> NoopAddressResolverGroup.INSTANCE;
+        };
     }
 
     @Override
     public WebClient getWebClient() {
-        return buildClient();
+        return webClientCache.get();
     }
 
     @Override
     public HttpServiceProxyFactory getHttpServiceProxyFactory(final String name) {
         final var timeOut = Duration.of(config.getTimeout(), config.getTimeUnit().toChronoUnit());
-        final var clientAdapter = WebClientAdapter.create(buildClient());
+        final var clientAdapter = WebClientAdapter.create(webClientCache.get());
         clientAdapter.setBlockTimeout(timeOut);
         clientAdapter.setReactiveAdapterRegistry(ReactiveAdapterRegistry.getSharedInstance());
-        return HttpServiceProxyFactory.builderFor(clientAdapter)
-                .build();
+        return HttpServiceProxyFactory.builderFor(clientAdapter).build();
     }
 
     @Override
     public <T> T declareClient(final Class<T> tClass) {
-        return getHttpServiceProxyFactory(tClass.getSimpleName() + "_HttpServiceProxyFactory")
-                .createClient(tClass);
+        return getHttpServiceProxyFactory(tClass.getSimpleName() + "_HttpServiceProxyFactory").createClient(tClass);
     }
 
     @Override

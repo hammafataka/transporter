@@ -1,5 +1,7 @@
 package dev.mfataka.transporter.rest;
 
+import java.time.Duration;
+
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -11,6 +13,8 @@ import lombok.extern.slf4j.Slf4j;
 
 /**
  * @author HAMMA FATAKA
+ * @project transporter
+ * @date 18.12.2023 14:28
  */
 @Slf4j
 @RestController
@@ -26,5 +30,10 @@ public class DemoController {
     @GetMapping(path = "/greeting/{name}")
     public Mono<String> greet(@PathVariable(name = "name") final String name) {
         return Mono.just("hello " + name);
+    }
+
+    @GetMapping(path = "/slow/{millis}")
+    public Mono<String> slow(@PathVariable("millis") final long millis) {
+        return Mono.just("slow").delayElement(Duration.ofMillis(millis));
     }
 }

@@ -7,6 +7,8 @@ import reactor.test.StepVerifier;
 
 /**
  * @author HAMMA FATAKA
+ * @project transporter
+ * @date 18.12.2023 14:31
  */
 public class DeclarativeClientTest extends AbstractTransporterTest {
 
@@ -14,7 +16,7 @@ public class DeclarativeClientTest extends AbstractTransporterTest {
     @Test
     void shouldCreateDeclarativeClient() {
         final var transporterBuilder = getTransporterBuilder()
-                .withBaseUrl("http://localhost:" + localPort+"/demo");
+                .withBaseUrl("http://localhost:" + localPort + "/demo");
 
         final var demoController = transporterBuilder.declareClient(DemoClientController.class);
         final var response = demoController.greet("bob");

@@ -1,111 +1,153 @@
 package dev.mfataka.transporter.imp;
 
+import static org.springframework.web.reactive.function.BodyInserters.fromFormData;
+import static org.springframework.web.reactive.function.BodyInserters.fromValue;
+
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.EnumMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
 
+import javax.annotation.concurrent.Immutable;
+import javax.annotation.concurrent.ThreadSafe;
+
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
+import org.springframework.util.CollectionUtils;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
-import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.util.UriBuilder;
 
-import lombok.extern.slf4j.Slf4j;
 
+import dev.mfataka.transporter.utils.JsonUtils;
 
 import dev.mfataka.transporter.config.TransporterConfiguration;
 import dev.mfataka.transporter.enums.TransporterMethod;
-import dev.mfataka.transporter.utils.JsonUtils;
-import dev.mfataka.transporter.utils.LoggingUtils;
+import dev.mfataka.transporter.filters.KibanaLoggingFilter;
+import dev.mfataka.transporter.utils.KibanaMarker;
+import dev.mfataka.transporter.utils.TransporterLog;
 
 /**
- * @author HAMMA FATAKA<br>
- * Project: base<br>
- * Date: 3/19/2022 2:32 AM
+ * Immutable transporter. Every {@code withX} returns a new instance; the
+ * receiver is never mutated. A single configured {@code DefaultTransporter}
+ * is safe to share across threads and to reuse for many requests.
+ *
+ * @author HAMMA FATAKA
  */
-@Slf4j
-public class DefaultTransporter implements Transporter {
-    private TransporterMethod method;
-    private Object body;
-    private MediaType contentType;
-    private String authHeader;
+@Immutable
+@ThreadSafe
+public final class DefaultTransporter implements Transporter {
+    private static final TransporterLog log = new TransporterLog(DefaultTransporter.class);
+    private static final String AUTHORIZATION = "Authorization";
+
+    @Nullable
+    private final TransporterMethod method;
+    @Nullable
+    private final Object body;
+    @Nullable
+    private final MediaType contentType;
+    @Nullable
+    private final String authHeader;
     private final WebClient webClient;
     private final TransporterConfiguration configuration;
-    private final Map<String, String> headers = new HashMap<>();
-    private final MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
-    public final String AUTHORIZATION = "Authorization";
-    private boolean authEnabled = false;
-    private final LoggingUtils loggingUtils;
+    private final Map<String, String> headers;
+    private final MultiValueMap<String, String> params;
+    @Nullable
+    private final String operator;
 
-    public DefaultTransporter(final TransporterMethod method,
-                              final WebClient webClient,
-                              final Object body,
-                              final TransporterConfiguration configuration) {
+    private DefaultTransporter(@Nullable TransporterMethod method,
+                               @Nullable Object body,
+                               @Nullable MediaType contentType,
+                               @Nullable String authHeader,
+                               WebClient webClient,
+                               TransporterConfiguration configuration,
+                               Map<String, String> headers,
+                               MultiValueMap<String, String> params,
+                               @Nullable String operator) {
         this.method = method;
-        this.webClient = webClient;
         this.body = body;
+        this.contentType = contentType;
+        this.authHeader = authHeader;
+        this.webClient = webClient;
         this.configuration = configuration;
-        this.loggingUtils = new LoggingUtils(log, Boolean.TRUE.equals(configuration.getDebugEnabled()));
+        this.headers = headers;
+        this.params = params;
+        this.operator = operator;
+    }
+
+    public static DefaultTransporter initial(final WebClient webClient,
+                                             final TransporterConfiguration configuration,
+                                             @Nullable final TransporterMethod method,
+                                             @Nullable final Object body) {
+        return new DefaultTransporter(method, body, null, null, webClient, configuration,
+                Map.of(), CollectionUtils.unmodifiableMultiValueMap(new LinkedMultiValueMap<>()), null);
     }
 
     @Override
     public Transporter withHeader(@NotNull final String headerName, @NotNull final String headerValue) {
-        loggingUtils.debugIfEnabled("adding key[{}], value [{}] to headers", headerName, headerValue);
-        headers.putIfAbsent(headerName, headerValue);
-        return this;
+        log.debugIfEnabled("adding key[{}], value [{}] to headers", headerName, headerValue);
+        if (headers.containsKey(headerName)) return this;
+        var next = new LinkedHashMap<>(headers);
+        next.put(headerName, headerValue);
+        return new DefaultTransporter(method, body, contentType, authHeader, webClient, configuration,
+                Map.copyOf(next), params, operator);
     }
 
     @Override
     public Transporter withUrlParam(@NotNull String paramName, @NotNull String paramValue) {
-        loggingUtils.debugIfEnabled("adding key[{}], value [{}] to url params", paramName, paramValue);
-        params.add(paramName, paramValue);
-        return this;
+        log.debugIfEnabled("adding key[{}], value [{}] to url params", paramName, paramValue);
+        var next = new LinkedMultiValueMap<>(params);
+        next.add(paramName, paramValue);
+        return new DefaultTransporter(method, body, contentType, authHeader, webClient, configuration,
+                headers, CollectionUtils.unmodifiableMultiValueMap(next), operator);
+    }
+
+    @Override
+    public Transporter withOperator(@NotNull final String operator) {
+        log.debugIfEnabled("setting kibana operator [{}]", operator);
+        return new DefaultTransporter(method, body, contentType, authHeader, webClient, configuration,
+                headers, params, operator);
     }
 
     @Override
     public Transporter basicAuth(@NotNull String username, @NotNull String password) {
-        this.authEnabled = true;
-        this.authHeader = "Basic " + HttpHeaders.encodeBasicAuth(username, password, null);
-        loggingUtils.debugIfEnabled("basic auth is set to [{}], readable format [{}],[{}]", authHeader, username, password);
-        return this;
+        final var auth = "Basic " + HttpHeaders.encodeBasicAuth(username, password, null);
+        log.debugIfEnabled("basic auth is set");
+        return new DefaultTransporter(method, body, contentType, auth, webClient, configuration, headers, params, operator);
     }
 
     @Override
     public Transporter bearerAuth(@NotNull String token) {
-        this.authEnabled = true;
-        this.authHeader = "Bearer " + token;
-        loggingUtils.debugIfEnabled("Bearer auth is set to [{}]", authHeader);
-        return this;
+        final var auth = "Bearer " + token;
+        log.debugIfEnabled("Bearer auth is set");
+        return new DefaultTransporter(method, body, contentType, auth, webClient, configuration, headers, params, operator);
     }
 
     @Override
     public Transporter method(@NotNull TransporterMethod method) {
-        this.method = method;
-        return this;
+        return new DefaultTransporter(method, body, contentType, authHeader, webClient, configuration, headers, params, operator);
     }
 
     @Override
     public Transporter bodyValue(@NotNull Object body) {
-        this.body = body;
-        return this;
+        return new DefaultTransporter(method, body, contentType, authHeader, webClient, configuration, headers, params, operator);
     }
 
     @Override
     public Transporter contentType(@NotNull MediaType mediaType) {
-        this.contentType = mediaType;
-        return this;
+        return new DefaultTransporter(method, body, mediaType, authHeader, webClient, configuration, headers, params, operator);
     }
 
     @Override
     public Transporter withContentLength() {
+        Objects.requireNonNull(body);
         final var maybeSerializedBody = JsonUtils.parseObjectToJson(body);
         if (maybeSerializedBody.isFailure()) {
             log.error("Failed to set contentLength, message: could not serialize object to json");
@@ -120,16 +162,9 @@ public class DefaultTransporter implements Transporter {
         if (method == null) {
             throw new IllegalStateException("Cannot use send without specifying request method");
         }
-        loggingUtils.debugIfEnabled("sending [{}] to url function [{}]", method, uriFunction);
-
-        final var requestBodySpec = (switch (method) {
-            case POST -> webClient.post();
-            case PUT -> webClient.put();
-            case DELETE -> webClient.method(HttpMethod.DELETE);
-            default -> webClient.method(HttpMethod.GET);
-        }).uri(uriFunction);
-
-        return buildBodyAndHeader(requestBodySpec);
+        log.debugIfEnabled("sending [{}] to url function [{}]", method, uriFunction);
+        final var spec = methodSpec().uri(uriFunction);
+        return applyConfigured(spec);
     }
 
     @Override
@@ -137,21 +172,14 @@ public class DefaultTransporter implements Transporter {
         if (method == null) {
             throw new IllegalStateException("Cannot use send without specifying request method");
         }
-        loggingUtils.debugIfEnabled("sending [{}] to url [{}]", method, url);
-
-        final var requestBodySpec = (switch (method) {
-            case POST -> webClient.post();
-            case PUT -> webClient.put();
-            case DELETE -> webClient.method(HttpMethod.DELETE);
-            default -> webClient.method(HttpMethod.GET);
-        }).uri(url);
-
-        return buildBodyAndHeader(requestBodySpec);
+        log.debugIfEnabled("sending [{}] to url [{}]", method, url);
+        final var spec = methodSpec().uri(url);
+        return applyConfigured(spec);
     }
 
+    @Override
     public WebClient.RequestBodySpec send(@NotNull final String url, @NotNull final TransporterMethod method) {
-        this.method = method;
-        return send(uriBuilder -> uriBuilder.path(url).build());
+        return this.method(method).send(url);
     }
 
     @Override
@@ -164,37 +192,47 @@ public class DefaultTransporter implements Transporter {
         return DefaultTransporterReceiver.of(configuration, send(url));
     }
 
+    @Override
     public TransporterReceiver sendAndReceive(@NotNull final String url, @NotNull final TransporterMethod method) {
-        this.method = method;
-        return sendAndReceive(url);
+        return this.method(method).sendAndReceive(url);
+    }
+
+    private WebClient.RequestBodyUriSpec methodSpec() {
+        Objects.requireNonNull(method);
+        return switch (method) {
+            case POST -> webClient.post();
+            case PUT -> webClient.put();
+            case DELETE -> webClient.method(HttpMethod.DELETE);
+            default -> webClient.method(HttpMethod.GET);
+        };
     }
 
     @NotNull
-    private WebClient.RequestBodySpec buildBodyAndHeader(final WebClient.RequestBodySpec requestBodySpec) {
-        try {
-            if (body != null) {
-                requestBodySpec.body(BodyInserters.fromValue(body));
-            }
-            if (authEnabled && Objects.nonNull(authHeader)) {
-                headers.putIfAbsent(AUTHORIZATION, authHeader);
-            }
-            if (!headers.isEmpty()) {
-                final var headerEntries = new ArrayList<>(headers.entrySet());
-                headerEntries.forEach(header -> requestBodySpec.header(header.getKey(), header.getValue()));
-            }
-            if (!params.isEmpty()) {
-                requestBodySpec.body(BodyInserters.fromFormData(params));
-            }
-            if (contentType != null) {
-                requestBodySpec.contentType(contentType);
-            }
-            return requestBodySpec;
-        } finally {
-            body = null;
-            authHeader = null;
-            authEnabled = false;
-            headers.clear();
-            params.clear();
+    private WebClient.RequestBodySpec applyConfigured(final WebClient.RequestBodySpec spec) {
+        if (body != null) spec.body(fromValue(body));
+        if (authHeader != null) spec.header(AUTHORIZATION, authHeader);
+        headers.forEach(spec::header);
+        if (!params.isEmpty()) spec.body(fromFormData(params));
+        if (contentType != null) spec.contentType(contentType);
+        if (configuration.isKibanaLoggingEnabled()) {
+            spec.attribute(KibanaLoggingFilter.MARKERS_ATTRIBUTE, resolveKibanaMarkers());
         }
+        return spec;
+    }
+
+    /**
+     * The resolved markers travel with the request itself and are read back by
+     * {@link KibanaLoggingFilter} on whatever thread the exchange completes on.
+     * The operator comes from the builder ({@code TransporterBuilder.operator(...)})
+     * unless overridden per call via {@link #withOperator(String)}; the remaining
+     * markers are derived or generated by the filter.
+     */
+    private Map<KibanaMarker, String> resolveKibanaMarkers() {
+        final var markers = new EnumMap<KibanaMarker, String>(KibanaMarker.class);
+        final var resolvedOperator = operator != null ? operator : configuration.getOperator();
+        if (resolvedOperator != null) {
+            markers.put(KibanaMarker.OPERATOR, resolvedOperator);
+        }
+        return Map.copyOf(markers);
     }
 }

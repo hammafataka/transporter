@@ -7,6 +7,7 @@ import org.springframework.web.service.invoker.HttpServiceProxyFactory;
 
 import io.netty.resolver.dns.DnsAddressResolverGroup;
 
+import dev.mfataka.transporter.config.ConfigurationResolver;
 import dev.mfataka.transporter.config.TransporterConfiguration;
 import dev.mfataka.transporter.model.TransporterClientResolver;
 
@@ -17,14 +18,27 @@ import dev.mfataka.transporter.model.TransporterClientResolver;
  */
 public interface TransporterBuilder {
 
+
+    /**
+     * STRICTLY ONLY FOR TESTING AND UNIT TEST
+     *
+     * @param configuration transporter config
+     * @return transporterBuilder
+     */
+    static TransporterBuilder testInstance(final TransporterConfiguration configuration) {
+        return DefaultTransporterBuilder.of(configuration);
+    }
+
+
     /**
      * method to create new instance of {@link TransporterBuilder}
      *
      * @param configuration configuration to be used
      * @return {@link TransporterBuilder}
      */
-    static TransporterBuilder newBuilder(final TransporterConfiguration configuration) {
-        return DefaultTransporterBuilder.of(configuration);
+    static TransporterBuilder newBuilder(final TransporterConfiguration configuration, final ConfigurationResolver resolver) {
+        final var resolved = resolver.resolveBaseConfigs(configuration);
+        return DefaultTransporterBuilder.of(resolved);
     }
 
     /**
@@ -42,7 +56,7 @@ public interface TransporterBuilder {
      *
      * @param transporterClientResolver The resolver group to use.
      * @return A WebClientBuilder
-     * do not use it with complex configurations, do not set something else if it was not clear what you should use.
+     * @apiNote do not use it with complex configurations, do not set something else if it was not clear what you should use.
      */
     TransporterBuilder resolver(@NotNull final TransporterClientResolver transporterClientResolver);
 
@@ -64,6 +78,17 @@ public interface TransporterBuilder {
 
 
     TransporterBuilder dataLimit(final int limitInBytes);
+
+    /**
+     * Sets the operator marker attached to every kibana call record emitted by
+     * this transporter (see {@code kibanaLoggingEnabled}). The operator is
+     * bound at build time — one transporter per remote operator — and can
+     * still be overridden per call via {@code Transporter.withOperator(...)}.
+     *
+     * @param operator operator identifier (e.g. "o2")
+     * @return {@link TransporterBuilder} for more configs
+     */
+    TransporterBuilder operator(@NotNull final String operator);
 
 
     /**

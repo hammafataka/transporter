@@ -5,6 +5,7 @@ import java.util.concurrent.TimeUnit;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 
 import dev.mfataka.transporter.Application;
@@ -14,8 +15,11 @@ import dev.mfataka.transporter.imp.TransporterBuilder;
 
 /**
  * @author HAMMA FATAKA
+ * @project transporter
+ * @date 15.05.2023 10:43
  */
 @ActiveProfiles("test")
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @SpringBootTest(classes = Application.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 public abstract class AbstractTransporterTest {
 
@@ -35,7 +39,7 @@ public abstract class AbstractTransporterTest {
 
     @NotNull
     protected static TransporterBuilder getTransporterBuilder() {
-        return TransporterBuilder.newBuilder(
+        return TransporterBuilder.testInstance(
                 TransporterConfiguration.builder()
                         .loggerEnabled(true)
                         .timeUnit(TimeUnit.SECONDS)

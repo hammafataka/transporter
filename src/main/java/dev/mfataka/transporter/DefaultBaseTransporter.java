@@ -1,53 +1,73 @@
 package dev.mfataka.transporter;
 
+import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 
 import org.jetbrains.annotations.NotNull;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import dev.mfataka.transporter.config.ConfigurationResolver;
 import dev.mfataka.transporter.config.TransporterConfiguration;
-import dev.mfataka.transporter.imp.DefaultTransporterBuilder;
 import dev.mfataka.transporter.imp.TransporterBuilder;
 import dev.mfataka.transporter.model.TransporterClientResolver;
 
-
 /**
- * @author HAMMA FATAKA<br>
- * Project: base<br>
- * Date: 3/18/2022 1:04 PM
+ * Stateless Spring-managed factory. Every {@code withX} returns a NEW
+ * {@code DefaultBaseTransporter} carrying its own immutable
+ * {@link TransporterConfiguration}; the receiver is never mutated.
+ *
+ * <p>The Spring-managed bean itself holds only the {@link ConfigurationResolver}
+ * plus a default seed config — it is safe to share across threads.</p>
+ *
+ * @author HAMMA FATAKA
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class DefaultBaseTransporter implements BaseTransporter {
-    private TransporterConfiguration clientConfig = TransporterConfiguration.builder()
-            .timeout(60L)
-            .timeUnit(TimeUnit.SECONDS)
-            .build();
     private final ConfigurationResolver configurationResolver;
+    private final TransporterConfiguration clientConfig;
+
+    @Autowired
+    public DefaultBaseTransporter(final ConfigurationResolver configurationResolver) {
+        this(configurationResolver, defaultConfig());
+    }
+
+    private DefaultBaseTransporter(final ConfigurationResolver resolver,
+                                   final TransporterConfiguration config) {
+        this.configurationResolver = resolver;
+        this.clientConfig = config;
+    }
+
+    private static TransporterConfiguration defaultConfig() {
+        return TransporterConfiguration.builder()
+                .timeout(60L)
+                .timeUnit(TimeUnit.SECONDS)
+                .build();
+    }
+
+    private BaseTransporter copy(final TransporterConfiguration newConfig) {
+        return new DefaultBaseTransporter(configurationResolver, newConfig);
+    }
 
     @Override
     public BaseTransporter withClientConfig(final TransporterConfiguration clientConfig) {
-        this.clientConfig = clientConfig;
-        return this;
+        return copy(clientConfig);
     }
-
 
     @Override
     public BaseTransporter withRedirection() {
-        this.clientConfig.setFollowRedirection(true);
-        return this;
+        return copy(clientConfig.toBuilder().followRedirection(true).build());
     }
 
     @Override
     public BaseTransporter withResolver(TransporterClientResolver resolver) {
-        this.clientConfig.setResolverEnabled(true);
-        this.clientConfig.setResolver(resolver.name());
-        return this;
+        return copy(clientConfig.toBuilder()
+                .resolverEnabled(true)
+                .resolver(resolver.name())
+                .build());
     }
 
     @Override
@@ -57,62 +77,77 @@ public class DefaultBaseTransporter implements BaseTransporter {
 
     @Override
     public BaseTransporter withTimeOut(long timeOut, @NotNull TimeUnit timeUnit) {
-        this.clientConfig.setTimeoutEnabled(true);
-        this.clientConfig.setTimeout(timeUnit.toSeconds(timeOut));
-        this.clientConfig.setTimeUnit(timeUnit);
-        return this;
+        return copy(clientConfig.toBuilder()
+                .timeoutEnabled(true)
+                .timeout(timeUnit.toSeconds(timeOut))
+                .timeUnit(timeUnit)
+                .build());
     }
-
 
     @Override
     public BaseTransporter secure(@NotNull final String trustStorePath, @NotNull final String trustStorePassword) {
-        this.clientConfig.setSslEnabled(true);
-        this.clientConfig.setTrustStorePath(trustStorePath);
-        this.clientConfig.setTrustStorePass(trustStorePassword);
-        return this;
+        return copy(clientConfig.toBuilder()
+                .sslEnabled(true)
+                .trustStorePath(trustStorePath)
+                .trustStorePass(trustStorePassword)
+                .build());
     }
 
     @Override
     public BaseTransporter withMtls(@NotNull String keyStorePath, @NotNull String keyStorePassword) {
-        this.clientConfig.setMtlsEnabled(true);
-        this.clientConfig.setKeystorePath(keyStorePath);
-        this.clientConfig.setKeystorePass(keyStorePassword);
-        return this;
+        return copy(clientConfig.toBuilder()
+                .mtlsEnabled(true)
+                .keystorePath(keyStorePath)
+                .keystorePass(keyStorePassword)
+                .build());
     }
-
 
     @Override
     public BaseTransporter withProxy(@NotNull final String proxyAddress, final int proxyPort, @NotNull final String proxySchema) {
-        this.clientConfig.setProxyEnabled(true);
-        this.clientConfig.setProxyAddress(proxyAddress);
-        this.clientConfig.setProxyPort(proxyPort);
-        return this;
+        return copy(clientConfig.toBuilder()
+                .proxyEnabled(true)
+                .proxyAddress(proxyAddress)
+                .proxyPort(proxyPort)
+                .build());
     }
 
     @Override
     public BaseTransporter withDebugging(@NotNull Boolean enabled) {
-        this.clientConfig.setDebugEnabled(enabled);
-        return this;
+        return copy(clientConfig.toBuilder().debugEnabled(enabled).build());
     }
 
     @Override
     public BaseTransporter withLogger() {
-        this.clientConfig.setLoggerEnabled(true);
-        return this;
+        return copy(clientConfig.toBuilder().loggerEnabled(true).build());
     }
-
 
     @Override
     public BaseTransporter trustAll() {
-        this.clientConfig.setSslEnabled(false);
-        this.clientConfig.setTrustAll(true);
-        return this;
+        return copy(clientConfig.toBuilder()
+                .sslEnabled(false)
+                .trustAll(true)
+                .build());
+    }
+
+    @Override
+    public BaseTransporter withConnectionPool(final int maxConnections, @NotNull final Duration pendingAcquireTimeout) {
+        return copy(clientConfig.toBuilder()
+                .maxConnections(maxConnections)
+                .pendingAcquireTimeout(pendingAcquireTimeout)
+                .build());
+    }
+
+    @Override
+    public BaseTransporter withConnectionPool(final int maxConnections, @NotNull final Duration pendingAcquireTimeout, final int pendingAcquireMaxCount) {
+        return copy(clientConfig.toBuilder()
+                .maxConnections(maxConnections)
+                .pendingAcquireTimeout(pendingAcquireTimeout)
+                .pendingAcquireMaxCount(pendingAcquireMaxCount)
+                .build());
     }
 
     @Override
     public TransporterBuilder toBuilder() {
-        configurationResolver.resolveBaseConfigs(clientConfig);
-        return DefaultTransporterBuilder.of(clientConfig);
+        return TransporterBuilder.newBuilder(clientConfig, configurationResolver);
     }
-
 }

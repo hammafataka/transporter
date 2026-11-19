@@ -14,6 +14,8 @@ import dev.mfataka.transporter.models.LargeDataResponse;
 
 /**
  * @author HAMMA FATAKA
+ * @project transporter
+ * @date 31.05.2023 15:36
  */
 public class TransporterLargeDataPropertyTest extends AbstractTransporterTest {
 

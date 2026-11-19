@@ -10,6 +10,8 @@ import org.springframework.validation.Errors;
 
 /**
  * @author HAMMA FATAKA
+ * @project transporter
+ * @date 22.07.2022 18:08
  */
 public final class MatcherValidator<T> extends AbstractValidator {
 

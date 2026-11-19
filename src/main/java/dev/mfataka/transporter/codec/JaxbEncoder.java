@@ -1,7 +1,6 @@
 package dev.mfataka.transporter.codec;
 
 import java.nio.charset.StandardCharsets;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -18,6 +17,7 @@ import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DataBufferFactory;
 import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.core.io.buffer.PooledDataBuffer;
+import org.springframework.http.MediaType;
 import org.springframework.util.ClassUtils;
 import org.springframework.util.MimeType;
 import org.springframework.util.MimeTypeUtils;
@@ -32,8 +32,11 @@ import lombok.SneakyThrows;
 
 /**
  * @author HAMMA FATAKA
+ * @project transporter
+ * @date 14.05.2023 20:23
  */
 public class JaxbEncoder implements Encoder<Object> {
+    
     private final JaxbContextRegistrar contextRegistrar = new JaxbContextRegistrar();
 
     @Override
@@ -71,14 +74,15 @@ public class JaxbEncoder implements Encoder<Object> {
 
     @Override
     public @NotNull List<MimeType> getEncodableMimeTypes() {
-        return Collections.singletonList(MimeTypeUtils.TEXT_XML);
+        return List.of(MimeTypeUtils.TEXT_XML, MimeTypeUtils.APPLICATION_XML, new MediaType("application", "*+xml"));
     }
 
 
     private Flux<DataBuffer> encode(final Object value,
                                     final DataBufferFactory bufferFactory) {
 
-        final var buffer = bufferFactory.allocateBuffer();
+
+        final var buffer = bufferFactory.allocateBuffer(1024);
         return Mono.fromCallable(() -> {
                     final var outputStream = buffer.asOutputStream();
                     final var clazz = ClassUtils.getUserClass(value);
@@ -92,7 +96,7 @@ public class JaxbEncoder implements Encoder<Object> {
                     message.writeTo(outputStream);
                     return buffer;
                 })
-                .doOnError(throwable -> DataBufferUtils.release(buffer))
+                .doFinally(signalType -> DataBufferUtils.release(buffer))
                 .flux();
     }
 

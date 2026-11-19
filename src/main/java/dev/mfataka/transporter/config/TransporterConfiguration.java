@@ -1,45 +1,68 @@
 package dev.mfataka.transporter.config;
 
+import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 
-import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.Value;
 
 /**
+ * Immutable value object carrying transporter settings.
+ * Use {@link #toBuilder()} to derive a modified copy:
+ * {@code config.toBuilder().baseUrl("...").build()}.
+ *
  * @author HAMMA FATAKA
  */
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
+@Value
+@Builder(toBuilder = true)
 public class TransporterConfiguration {
-    private boolean proxyEnabled;
-    private boolean followRedirection;
-    private boolean timeoutEnabled;
-    private boolean resolverEnabled;
-    private Boolean debugEnabled;
-    private Boolean mtlsEnabled;
-    private Boolean sslEnabled;
-    private Boolean loggerEnabled;
-    private Boolean logAuthHeaderEnabled;
-    private String resolver;
-    private String baseUrl;
-    private String trustStorePath;
-    private String trustStorePass;
-    private String keystorePath;
-    private String keystorePass;
-    private String proxyAddress;
+    boolean proxyEnabled;
+    boolean followRedirection;
+    boolean timeoutEnabled;
+    boolean resolverEnabled;
+    Boolean debugEnabled;
+    Boolean mtlsEnabled;
+    Boolean sslEnabled;
+    Boolean loggerEnabled;
+    Boolean logAuthHeaderEnabled;
+    String resolver;
+    String baseUrl;
+    String trustStorePath;
+    String trustStorePass;
+    String keystorePath;
+    String keystorePass;
+    String proxyAddress;
     @Builder.Default
-    private Integer proxyPort = 0;
+    Integer proxyPort = 0;
     @Builder.Default
-    private Long timeout = 0L;
-    private TimeUnit timeUnit;
-    private boolean checkRequiredFields;
-    private boolean requiredNonNull;
-    private Boolean trustAll;
-    private Integer dataLimit;
-    private String alias;
-    private String certPath;
+    Long timeout = 0L;
+    TimeUnit timeUnit;
+    boolean checkRequiredFields;
+    boolean requiredNonNull;
+    Boolean trustAll;
+    Integer dataLimit;
+    String alias;
+    String certPath;
+    Integer maxConnections;
+    Duration pendingAcquireTimeout;
+    Integer pendingAcquireMaxCount;
+    Boolean kibanaLoggingEnabled;
+    String operator;
+
+    public int getDataLimitOrDefault() {
+        return dataLimit == null ? 256 * 1024 : dataLimit;
+    }
+
+    public Duration getPendingAcquireTimeoutOrDefault() {
+        return pendingAcquireTimeout != null ? pendingAcquireTimeout : Duration.ofSeconds(10);
+    }
+
+    public int getPendingAcquireMaxCountOrDefault() {
+        if (pendingAcquireMaxCount != null) return pendingAcquireMaxCount;
+        return maxConnections != null ? 2 * maxConnections : 100;
+    }
+
+    public boolean isKibanaLoggingEnabled() {
+        return Boolean.TRUE.equals(kibanaLoggingEnabled);
+    }
 }

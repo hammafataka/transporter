@@ -5,16 +5,34 @@ import java.util.Optional;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-
 import dev.mfataka.transporter.model.TransporterClientResolver;
 
 /**
  * @author HAMMA FATAKA
+ * @project transporter
+ * @date 22.08.2022 13:52
  * purpose of this resolver is to get common configs for each transporter execution,
  * whenever transporter is used and the common configs are not set separately
  * it will try to resolve it by looking into configs
  */
 public interface ConfigurationResolver {
+    String TRANSPORTER_PREFIX = "transporter";
+    String RESOLVER_PROP = TRANSPORTER_PREFIX + ".resolver";
+    String TRUST_STORE_PROP = TRANSPORTER_PREFIX + ".trustStorePath";
+    String TRUST_STORE_PASS_PROP = TRANSPORTER_PREFIX + ".trustStorePassword";
+    String KEY_STORE_PROP = TRANSPORTER_PREFIX + ".keyStorePath";
+    String KEY_STORE_PASS_PROP = TRANSPORTER_PREFIX + ".keyStorePassword";
+    String REQUIRED_NON_NULL_PROP = TRANSPORTER_PREFIX + ".requireNonNullEnabled";
+    String CHECK_REQUIRED_FIELDS_PROP = TRANSPORTER_PREFIX + ".checkRequiredFields";
+    String AUTH_HEADER_LOGGING_PROP = TRANSPORTER_PREFIX + ".authHeaderLoggingEnabled";
+    String LOGGING_ENABLED_PROP = TRANSPORTER_PREFIX + ".authHeaderLoggingEnabled";
+    String SECURED_ENABLED_PROP = TRANSPORTER_PREFIX + ".secured";
+    String MTLS_ENABLED_PROP = TRANSPORTER_PREFIX + ".mtlsEnabled";
+    String DEBUG_ENABLED_PROP = TRANSPORTER_PREFIX + ".debugEnabled";
+    String DATA_LIMIT_PROP = TRANSPORTER_PREFIX + ".dataLimit";
+    String TRUST_ALL_PROP = TRANSPORTER_PREFIX + ".trustAll";
+    String ALIAS_PROP = TRANSPORTER_PREFIX + ".alias";
+    String KIBANA_LOGGING_ENABLED_PROP = TRANSPORTER_PREFIX + ".kibanaLoggingEnabled";
 
     /**
      * If the given resolver is null, checks config files for 'transporter.resolver' if still not find then it returns unknown resolver.
@@ -30,7 +48,7 @@ public interface ConfigurationResolver {
      * otherwise returns valid value either passed or gets from property
      *
      * @param path The path to the trust store.
-     * @return AN Optional
+     * @return A Optional<String>
      */
     Optional<String> resolveTrustStorePath(@Nullable final String path);
 
@@ -39,7 +57,7 @@ public interface ConfigurationResolver {
      * otherwise returns valid value either passed or gets from property
      *
      * @param password The password to the trust store.
-     * @return A Optional
+     * @return A Optional<String>
      */
     Optional<String> resolveTrustStorePassword(@Nullable final String password);
 
@@ -48,7 +66,7 @@ public interface ConfigurationResolver {
      * otherwise returns valid value either passed or gets from property
      *
      * @param path The path to the trust store.
-     * @return A Optional
+     * @return A Optional<String>
      */
     Optional<String> resolveKeyStorePath(@Nullable final String path);
 
@@ -57,7 +75,7 @@ public interface ConfigurationResolver {
      * otherwise returns valid value either passed or gets from property
      *
      * @param password The password to the trust store.
-     * @return A Optional
+     * @return A Optional<String>
      */
     Optional<String> resolveKeyStorePassword(@Nullable final String password);
 
@@ -116,11 +134,12 @@ public interface ConfigurationResolver {
     boolean resolveMtls(@Nullable final Boolean mtlsEnabled);
 
     /**
-     * it will set base configs used to build Transporter to TransporterConfiguration
+     * Returns the resolved configuration derived from the given config.
      *
      * @param config The configuration object that will be used to resolve the base configurations.
+     * @return resolved {@link TransporterConfiguration}
      */
-    void resolveBaseConfigs(@NotNull final TransporterConfiguration config);
+    TransporterConfiguration resolveBaseConfigs(@NotNull final TransporterConfiguration config);
 
     /**
      * If the given sslEnabled is null, checks config files for 'transporter.debugEnabled' if still not find then it returns false.
@@ -135,4 +154,24 @@ public interface ConfigurationResolver {
 
     Optional<String> resolveAlias(@Nullable final String alias);
 
+    /**
+     * If the given kibanaLoggingEnabled is null, checks config files for 'transporter.kibanaLoggingEnabled',
+     * if still not found then it returns false.
+     *
+     * @param kibanaLoggingEnabled If true, one kibana record with markers is emitted per outgoing call.
+     * @return A boolean value.
+     */
+    boolean resolveKibanaLoggingEnabled(@Nullable final Boolean kibanaLoggingEnabled);
+
+    default boolean isDebugEnabled() {
+        return resolvePropertyBool(DEBUG_ENABLED_PROP);
+    }
+
+    default boolean resolvePropertyBool(@NotNull final String property) {
+        return resolveProperty(property)
+                .map(Boolean::parseBoolean)
+                .orElse(Boolean.FALSE);
+    }
+
+    Optional<String> resolveProperty(@NotNull final String property);
 }

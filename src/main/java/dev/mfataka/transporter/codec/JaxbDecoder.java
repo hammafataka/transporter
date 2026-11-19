@@ -23,17 +23,22 @@ import lombok.SneakyThrows;
 
 /**
  * @author HAMMA FATAKA
+ * @project transporter
+ * @date 14.05.2023 5:41
  */
 public class JaxbDecoder extends Jaxb2XmlDecoder {
 
     private final JaxbContextRegistrar jaxbContexts = new JaxbContextRegistrar();
 
+    public JaxbDecoder(int byteCount) {
+        setMaxInMemorySize(byteCount);
+    }
 
     @Override
-    public Object decode(final @NotNull DataBuffer dataBuffer,
-                         final @NotNull ResolvableType targetType,
-                         final @Nullable MimeType mimeType,
-                         final @Nullable Map<String, Object> hints) {
+    public @NotNull Object decode(final @NotNull DataBuffer dataBuffer,
+                                  final @NotNull ResolvableType targetType,
+                                  final @Nullable MimeType mimeType,
+                                  final @Nullable Map<String, Object> hints) {
         try {
             final var helper = new DefaultStrategiesHelper(WebServiceTemplate.class);
             final var messageFactory = (SoapMessageFactory) helper.getDefaultStrategy(WebServiceMessageFactory.class);

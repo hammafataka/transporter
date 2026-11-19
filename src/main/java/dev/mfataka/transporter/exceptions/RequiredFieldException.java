@@ -5,6 +5,8 @@ import org.springframework.validation.Errors;
 
 /**
  * @author HAMMA FATAKA
+ * @project transporter
+ * @date 22.07.2022 19:27
  */
 public class RequiredFieldException extends NestedRuntimeException {
 

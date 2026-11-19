@@ -9,10 +9,13 @@ import jakarta.xml.bind.JAXBException;
 import jakarta.xml.bind.Marshaller;
 import jakarta.xml.bind.Unmarshaller;
 
+
 import lombok.SneakyThrows;
 
 /**
  * @author HAMMA FATAKA
+ * @project transporter
+ * @date 14.05.2023 5:42
  */
 public class JaxbContextRegistrar {
     private final ConcurrentMap<Class<?>, JAXBContext> jaxbContexts = new ConcurrentHashMap<>();
@@ -29,7 +32,7 @@ public class JaxbContextRegistrar {
 
     @SneakyThrows
     private JAXBContext getJaxbContext(final Class<?> clazz) {
-        Objects.requireNonNull(clazz, "class cannot be null");
+        Objects.requireNonNull(clazz);
         return this.jaxbContexts.computeIfAbsent(clazz, tClass -> {
             try {
                 return JAXBContext.newInstance(clazz);

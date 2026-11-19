@@ -9,6 +9,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.util.UriBuilder;
 
 import dev.mfataka.transporter.enums.TransporterMethod;
+import dev.mfataka.transporter.utils.KibanaMarker;
 
 /**
  * @author HAMMA FATAKA<br>
@@ -64,6 +65,19 @@ public interface Transporter {
      * @return {@link  Transporter} for more config set
      */
     Transporter withUrlParam(@NotNull final String paramName, @NotNull final String paramValue);
+
+    /**
+     * Overrides the {@link KibanaMarker#OPERATOR} marker of the per-call kibana
+     * log record for this call chain; without it the operator set at build time
+     * ({@code TransporterBuilder.operator(...)}) is used. All other markers
+     * (endpoint, status, result, duration, correlation id) are derived or
+     * generated automatically and cannot be set by the caller.
+     * Only has an effect when {@code kibanaLoggingEnabled} is set on the configuration.
+     *
+     * @param operator operator identifier (e.g. "o2")
+     * @return {@link Transporter} for more config set
+     */
+    Transporter withOperator(@NotNull final String operator);
 
     /**
      * Adds a URL parameter to the request using a function to build the URI
